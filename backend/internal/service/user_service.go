@@ -23,11 +23,11 @@ func NewUserService(userRepo *repository.UserRepo, authService *AuthService) *Us
 	}
 }
 
-// Create creates a new user, hashing the password for non-customer roles if provided.
+// Create creates a new user, hashing the password if provided.
 func (s *UserService) Create(ctx context.Context, req *model.CreateUserRequest) (*model.User, error) {
 	var passwordHash *string
 
-	if req.Role != model.RoleCustomer && req.Password != nil && *req.Password != "" {
+	if req.Password != nil && *req.Password != "" {
 		hash, err := s.authService.HashPassword(*req.Password)
 		if err != nil {
 			return nil, fmt.Errorf("hash password: %w", err)
@@ -60,28 +60,16 @@ func (s *UserService) List(ctx context.Context, role *model.UserRole) ([]*model.
 	return users, nil
 }
 
-// Update updates a user's profile. Hashes a new password if provided and the user is not a customer.
+// Update updates a user's profile. Hashes a new password if provided.
 func (s *UserService) Update(ctx context.Context, id uuid.UUID, req *model.UpdateUserRequest) (*model.User, error) {
 	var passwordHash *string
 
 	if req.Password != nil && *req.Password != "" {
-		// Determine effective role
-		targetRole := model.RoleCustomer
-		existing, err := s.userRepo.GetByID(ctx, id)
-		if err == nil {
-			targetRole = existing.Role
+		hash, err := s.authService.HashPassword(*req.Password)
+		if err != nil {
+			return nil, fmt.Errorf("hash password: %w", err)
 		}
-		if req.Role != nil {
-			targetRole = *req.Role
-		}
-
-		if targetRole != model.RoleCustomer {
-			hash, err := s.authService.HashPassword(*req.Password)
-			if err != nil {
-				return nil, fmt.Errorf("hash password: %w", err)
-			}
-			passwordHash = &hash
-		}
+		passwordHash = &hash
 	}
 
 	user, err := s.userRepo.Update(ctx, id, req, passwordHash)

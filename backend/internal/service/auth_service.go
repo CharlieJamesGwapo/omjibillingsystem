@@ -118,15 +118,11 @@ func (s *AuthService) VerifyOTP(ctx context.Context, phone, code string) (*Token
 	return tokens, user, nil
 }
 
-// Login authenticates admin/technician users via password. Customers must use OTP.
+// Login authenticates users via password.
 func (s *AuthService) Login(ctx context.Context, phone, password string) (*TokenPair, *model.User, error) {
 	user, err := s.userRepo.GetByPhone(ctx, phone)
 	if err != nil {
 		return nil, nil, ErrInvalidCredentials
-	}
-
-	if user.Role == model.RoleCustomer {
-		return nil, nil, ErrCustomerMustUseOTP
 	}
 
 	if user.PasswordHash == nil {
