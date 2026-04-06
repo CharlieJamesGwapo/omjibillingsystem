@@ -3,36 +3,54 @@ package handler
 import (
 	"errors"
 	"net/http"
+	"strconv"
 
 	"github.com/jdns/billingsystem/internal/middleware"
 	"github.com/jdns/billingsystem/internal/model"
+	"github.com/jdns/billingsystem/internal/repository"
 	"github.com/jdns/billingsystem/internal/service"
 )
 
 // PaymentHandler handles payment-related HTTP requests.
 type PaymentHandler struct {
 	paymentService *service.PaymentService
+	paymentRepo    *repository.PaymentRepo
 }
 
 // NewPaymentHandler creates a new PaymentHandler.
-func NewPaymentHandler(paymentService *service.PaymentService) *PaymentHandler {
-	return &PaymentHandler{paymentService: paymentService}
+func NewPaymentHandler(paymentService *service.PaymentService, paymentRepo *repository.PaymentRepo) *PaymentHandler {
+	return &PaymentHandler{paymentService: paymentService, paymentRepo: paymentRepo}
 }
 
-// List returns payments. Supports ?status=pending|approved|rejected filter.
+// List returns payments with pagination and search support.
+// Query params: ?page=1&limit=20&search=&status=
 func (h *PaymentHandler) List(w http.ResponseWriter, r *http.Request) {
-	var statusFilter *model.PaymentStatus
-	if statusStr := r.URL.Query().Get("status"); statusStr != "" {
-		status := model.PaymentStatus(statusStr)
-		statusFilter = &status
+	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+	if page < 1 {
+		page = 1
 	}
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	if limit < 1 {
+		limit = 20
+	}
+	if limit > 100 {
+		limit = 100
+	}
+	offset := (page - 1) * limit
+	search := r.URL.Query().Get("search")
+	status := r.URL.Query().Get("status")
 
-	payments, err := h.paymentService.List(r.Context(), statusFilter)
+	payments, total, err := h.paymentRepo.ListPaginated(r.Context(), status, search, limit, offset)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to list payments")
 		return
 	}
-	writeJSON(w, http.StatusOK, payments)
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"data":  payments,
+		"total": total,
+		"page":  page,
+		"limit": limit,
+	})
 }
 
 // ListMine returns payments belonging to the authenticated user.

@@ -12,31 +12,36 @@ interface ActivityLog {
   created_at: string;
 }
 
-const LOGS_PER_PAGE = 20;
+const LIMIT = 20;
 
 export default function ActivityLogs() {
   const [logs, setLogs] = useState<ActivityLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [expandedDetail, setExpandedDetail] = useState<string | null>(null);
-  const [visibleCount, setVisibleCount] = useState(LOGS_PER_PAGE);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+
+  const fetchLogs = async () => {
+    try {
+      const params = new URLSearchParams({
+        page: String(page),
+        limit: String(LIMIT),
+      });
+      const res = await api.get<{ data: ActivityLog[]; total: number; page: number; limit: number }>(`/dashboard/logs?${params}`);
+      setLogs(res.data.data ?? []);
+      setTotal(res.data.total ?? 0);
+    } catch {
+      setError('Failed to load activity logs');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    async function fetchLogs() {
-      try {
-        const res = await api.get<ActivityLog[]>('/dashboard/logs');
-        const sorted = (res.data ?? []).sort(
-          (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-        );
-        setLogs(sorted);
-      } catch {
-        setError('Failed to load activity logs');
-      } finally {
-        setLoading(false);
-      }
-    }
+    setLoading(true);
     fetchLogs();
-  }, []);
+  }, [page]);
 
   const formatDateTime = (date: string) =>
     new Date(date).toLocaleString('en-PH', {
@@ -66,9 +71,6 @@ export default function ActivityLogs() {
       </div>
     );
   }
-
-  const visibleLogs = logs.slice(0, visibleCount);
-  const hasMore = visibleCount < logs.length;
 
   return (
     <div className="space-y-6 animate-in">
@@ -112,7 +114,7 @@ export default function ActivityLogs() {
                   </td>
                 </tr>
               ) : (
-                visibleLogs.map((log) => (
+                logs.map((log) => (
                   <tr key={log.id}>
                     <td className="whitespace-nowrap">
                       <span className="font-[Outfit] text-text-secondary text-xs tabular-nums">
@@ -168,19 +170,32 @@ export default function ActivityLogs() {
             </tbody>
           </table>
         </div>
+      </div>
 
-        {/* Show More */}
-        {hasMore && (
-          <div className="px-4 py-4 border-t border-white/5 flex justify-center">
+      {/* Pagination */}
+      {total > 0 && (
+        <div className="flex items-center justify-between mt-6">
+          <p className="text-sm" style={{ color: '#64748b', fontFamily: "'Outfit', sans-serif" }}>
+            Showing {Math.min((page - 1) * LIMIT + 1, total)}&ndash;{Math.min(page * LIMIT, total)} of {total}
+          </p>
+          <div className="flex gap-2">
             <button
-              onClick={() => setVisibleCount((c) => c + LOGS_PER_PAGE)}
-              className="btn-outline text-xs"
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              disabled={page <= 1}
+              className="btn-outline disabled:opacity-30"
             >
-              Show More ({logs.length - visibleCount} remaining)
+              Previous
+            </button>
+            <button
+              onClick={() => setPage(p => p + 1)}
+              disabled={page * LIMIT >= total}
+              className="btn-outline disabled:opacity-30"
+            >
+              Next
             </button>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -72,7 +72,20 @@ func (h *SettingsHandler) UpdateSettings(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	if err := h.settingsRepo.SetMultiple(r.Context(), req.Settings); err != nil {
+	// Filter out masked values — don't overwrite real secrets with placeholders
+	filtered := make(map[string]string)
+	for k, v := range req.Settings {
+		if v == "••••••" {
+			continue // Skip masked values
+		}
+		filtered[k] = v
+	}
+	if len(filtered) == 0 {
+		writeError(w, http.StatusBadRequest, "no settings to update")
+		return
+	}
+
+	if err := h.settingsRepo.SetMultiple(r.Context(), filtered); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to update settings")
 		return
 	}

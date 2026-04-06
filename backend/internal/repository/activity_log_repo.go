@@ -79,5 +79,49 @@ func (r *ActivityLogRepo) List(ctx context.Context, limit int) ([]*model.Activit
 	return logs, rows.Err()
 }
 
+func (r *ActivityLogRepo) ListPaginated(ctx context.Context, limit, offset int) ([]*model.ActivityLog, int, error) {
+	if limit <= 0 {
+		limit = 20
+	}
+
+	// Count total
+	var total int
+	if err := r.db.QueryRow(ctx, "SELECT COUNT(*) FROM activity_logs").Scan(&total); err != nil {
+		return nil, 0, fmt.Errorf("count activity logs: %w", err)
+	}
+
+	rows, err := r.db.Query(ctx, `
+		SELECT al.id, al.user_id, al.action, al.target_type, al.target_id, al.details, al.ip_address, al.created_at,
+		       u.full_name
+		FROM activity_logs al
+		JOIN users u ON u.id = al.user_id
+		ORDER BY al.created_at DESC
+		LIMIT $1 OFFSET $2`, limit, offset)
+	if err != nil {
+		return nil, 0, fmt.Errorf("list activity logs paginated: %w", err)
+	}
+	defer rows.Close()
+
+	var logs []*model.ActivityLog
+	for rows.Next() {
+		al := &model.ActivityLog{}
+		var detailsRaw []byte
+		if err := rows.Scan(&al.ID, &al.UserID, &al.Action, &al.TargetType, &al.TargetID,
+			&detailsRaw, &al.IPAddress, &al.CreatedAt, &al.UserName); err != nil {
+			return nil, 0, fmt.Errorf("scan activity log: %w", err)
+		}
+		if detailsRaw != nil {
+			if err := json.Unmarshal(detailsRaw, &al.Details); err != nil {
+				return nil, 0, fmt.Errorf("unmarshal activity log details: %w", err)
+			}
+		}
+		logs = append(logs, al)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, 0, err
+	}
+	return logs, total, nil
+}
+
 // Ensure uuid is used (for TargetID type compatibility)
 var _ uuid.UUID

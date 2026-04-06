@@ -83,6 +83,59 @@ func (r *UserRepo) List(ctx context.Context, role *model.UserRole) ([]*model.Use
 	return users, rows.Err()
 }
 
+func (r *UserRepo) ListPaginated(ctx context.Context, role string, search string, limit, offset int) ([]*model.User, int, error) {
+	where := []string{}
+	args := []interface{}{}
+	argIdx := 1
+
+	if role != "" {
+		where = append(where, fmt.Sprintf("role = $%d", argIdx))
+		args = append(args, role)
+		argIdx++
+	}
+	if search != "" {
+		where = append(where, fmt.Sprintf("(full_name ILIKE $%d OR phone ILIKE $%d)", argIdx, argIdx))
+		args = append(args, "%"+search+"%")
+		argIdx++
+	}
+
+	whereClause := ""
+	if len(where) > 0 {
+		whereClause = " WHERE " + strings.Join(where, " AND ")
+	}
+
+	// Count total
+	var total int
+	countQuery := "SELECT COUNT(*) FROM users" + whereClause
+	if err := r.db.QueryRow(ctx, countQuery, args...).Scan(&total); err != nil {
+		return nil, 0, fmt.Errorf("count users: %w", err)
+	}
+
+	// Fetch paginated
+	dataQuery := "SELECT id, phone, full_name, email, address, role, status, created_at, updated_at FROM users" + whereClause +
+		fmt.Sprintf(" ORDER BY created_at DESC LIMIT $%d OFFSET $%d", argIdx, argIdx+1)
+	dataArgs := append(args, limit, offset)
+
+	rows, err := r.db.Query(ctx, dataQuery, dataArgs...)
+	if err != nil {
+		return nil, 0, fmt.Errorf("list users paginated: %w", err)
+	}
+	defer rows.Close()
+
+	var users []*model.User
+	for rows.Next() {
+		u := &model.User{}
+		if err := rows.Scan(&u.ID, &u.Phone, &u.FullName, &u.Email, &u.Address, &u.Role, &u.Status, &u.CreatedAt, &u.UpdatedAt); err != nil {
+			return nil, 0, fmt.Errorf("scan user: %w", err)
+		}
+		users = append(users, u)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, 0, err
+	}
+	return users, total, nil
+}
+
 func (r *UserRepo) Update(ctx context.Context, id uuid.UUID, req *model.UpdateUserRequest, passwordHash *string) (*model.User, error) {
 	setClauses := []string{}
 	args := []interface{}{}

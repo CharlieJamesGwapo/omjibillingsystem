@@ -2,37 +2,55 @@ package handler
 
 import (
 	"net/http"
+	"strconv"
 
 	"github.com/google/uuid"
 	"github.com/jdns/billingsystem/internal/middleware"
 	"github.com/jdns/billingsystem/internal/model"
+	"github.com/jdns/billingsystem/internal/repository"
 	"github.com/jdns/billingsystem/internal/service"
 )
 
 // UserHandler handles user management HTTP requests.
 type UserHandler struct {
 	userService *service.UserService
+	userRepo    *repository.UserRepo
 }
 
 // NewUserHandler creates a new UserHandler.
-func NewUserHandler(userService *service.UserService) *UserHandler {
-	return &UserHandler{userService: userService}
+func NewUserHandler(userService *service.UserService, userRepo *repository.UserRepo) *UserHandler {
+	return &UserHandler{userService: userService, userRepo: userRepo}
 }
 
-// List returns all users, optionally filtered by ?role=.
+// List returns users with pagination and search support.
+// Query params: ?page=1&limit=20&search=&role=
 func (h *UserHandler) List(w http.ResponseWriter, r *http.Request) {
-	var roleFilter *model.UserRole
-	if roleStr := r.URL.Query().Get("role"); roleStr != "" {
-		role := model.UserRole(roleStr)
-		roleFilter = &role
+	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+	if page < 1 {
+		page = 1
 	}
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	if limit < 1 {
+		limit = 20
+	}
+	if limit > 100 {
+		limit = 100
+	}
+	offset := (page - 1) * limit
+	search := r.URL.Query().Get("search")
+	role := r.URL.Query().Get("role")
 
-	users, err := h.userService.List(r.Context(), roleFilter)
+	users, total, err := h.userRepo.ListPaginated(r.Context(), role, search, limit, offset)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to list users")
 		return
 	}
-	writeJSON(w, http.StatusOK, users)
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"data":  users,
+		"total": total,
+		"page":  page,
+		"limit": limit,
+	})
 }
 
 // GetByID retrieves a single user. Customers may only view their own profile.

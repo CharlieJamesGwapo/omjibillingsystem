@@ -18,20 +18,40 @@ const emptyForm: CustomerForm = {
   address: '',
 };
 
+const LIMIT = 20;
+
 export default function Customers() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<CustomerForm>(emptyForm);
   const [submitting, setSubmitting] = useState(false);
 
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search);
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [search]);
+
   const fetchUsers = async () => {
     try {
-      const res = await api.get<User[]>('/users');
-      setUsers((res.data ?? []).filter((u) => u.role === 'customer'));
+      const params = new URLSearchParams({
+        role: 'customer',
+        page: String(page),
+        limit: String(LIMIT),
+      });
+      if (debouncedSearch) params.set('search', debouncedSearch);
+      const res = await api.get<{ data: User[]; total: number; page: number; limit: number }>(`/users?${params}`);
+      setUsers(res.data.data ?? []);
+      setTotal(res.data.total ?? 0);
     } catch {
       setError('Failed to load customers');
     } finally {
@@ -40,12 +60,9 @@ export default function Customers() {
   };
 
   useEffect(() => {
+    setLoading(true);
     fetchUsers();
-  }, []);
-
-  const filtered = users.filter((u) =>
-    u.full_name.toLowerCase().includes(search.toLowerCase())
-  );
+  }, [page, debouncedSearch]);
 
   const openAdd = () => {
     setForm(emptyForm);
@@ -178,7 +195,7 @@ export default function Customers() {
               </tr>
             </thead>
             <tbody>
-              {filtered.length === 0 ? (
+              {users.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="!text-center !py-16">
                     <div className="flex flex-col items-center gap-3">
@@ -190,7 +207,7 @@ export default function Customers() {
                   </td>
                 </tr>
               ) : (
-                filtered.map((user) => (
+                users.map((user) => (
                   <tr key={user.id}>
                     <td className="!font-semibold !text-[#f1f5f9]">{user.full_name}</td>
                     <td><span className="font-mono text-xs">{user.phone}</span></td>
@@ -217,7 +234,7 @@ export default function Customers() {
 
       {/* Mobile Card Layout */}
       <div className="md:hidden space-y-3 animate-in animate-in-2">
-        {filtered.length === 0 ? (
+        {users.length === 0 ? (
           <div className="glass-card p-8 text-center">
             <svg className="w-12 h-12 text-[#334155] mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z" />
@@ -225,7 +242,7 @@ export default function Customers() {
             <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, color: '#64748b' }}>No customers found</p>
           </div>
         ) : (
-          filtered.map((user) => (
+          users.map((user) => (
             <div key={user.id} className="glass-card p-4">
               <div className="flex items-start justify-between mb-3">
                 <div>
@@ -251,6 +268,31 @@ export default function Customers() {
           ))
         )}
       </div>
+
+      {/* Pagination */}
+      {total > 0 && (
+        <div className="flex items-center justify-between mt-6">
+          <p className="text-sm" style={{ color: '#64748b', fontFamily: "'Outfit', sans-serif" }}>
+            Showing {Math.min((page - 1) * LIMIT + 1, total)}&ndash;{Math.min(page * LIMIT, total)} of {total}
+          </p>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              disabled={page <= 1}
+              className="btn-outline disabled:opacity-30"
+            >
+              Previous
+            </button>
+            <button
+              onClick={() => setPage(p => p + 1)}
+              disabled={page * LIMIT >= total}
+              className="btn-outline disabled:opacity-30"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Modal */}
       {modalOpen && (

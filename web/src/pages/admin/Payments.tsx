@@ -2,17 +2,38 @@ import { useState, useEffect } from 'react';
 import api from '../../lib/api';
 import type { Payment, PaymentStatus } from '../../lib/types';
 
+const LIMIT = 20;
+
 export default function Payments() {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [filter, setFilter] = useState<'all' | PaymentStatus>('all');
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search);
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [search]);
 
   const fetchPayments = async () => {
     try {
-      const res = await api.get<Payment[]>('/payments');
-      setPayments(res.data ?? []);
+      const params = new URLSearchParams({
+        page: String(page),
+        limit: String(LIMIT),
+      });
+      if (debouncedSearch) params.set('search', debouncedSearch);
+      if (filter !== 'all') params.set('status', filter);
+      const res = await api.get<{ data: Payment[]; total: number; page: number; limit: number }>(`/payments?${params}`);
+      setPayments(res.data.data ?? []);
+      setTotal(res.data.total ?? 0);
     } catch {
       setError('Failed to load payments');
     } finally {
@@ -21,8 +42,14 @@ export default function Payments() {
   };
 
   useEffect(() => {
+    setLoading(true);
     fetchPayments();
-  }, []);
+  }, [page, debouncedSearch, filter]);
+
+  const handleFilterChange = (value: 'all' | PaymentStatus) => {
+    setFilter(value);
+    setPage(1);
+  };
 
   const formatCurrency = (amount: number) =>
     `₱${amount.toLocaleString('en-PH', { minimumFractionDigits: 2 })}`;
@@ -95,13 +122,11 @@ export default function Payments() {
     }
   };
 
-  const filtered = filter === 'all' ? payments : payments.filter((p) => p.status === filter);
-
-  const filterButtons: { label: string; value: 'all' | PaymentStatus; count: number }[] = [
-    { label: 'All', value: 'all', count: payments.length },
-    { label: 'Pending', value: 'pending' as PaymentStatus, count: payments.filter((p) => p.status === 'pending').length },
-    { label: 'Approved', value: 'approved' as PaymentStatus, count: payments.filter((p) => p.status === 'approved').length },
-    { label: 'Rejected', value: 'rejected' as PaymentStatus, count: payments.filter((p) => p.status === 'rejected').length },
+  const filterButtons: { label: string; value: 'all' | PaymentStatus }[] = [
+    { label: 'All', value: 'all' },
+    { label: 'Pending', value: 'pending' as PaymentStatus },
+    { label: 'Approved', value: 'approved' as PaymentStatus },
+    { label: 'Rejected', value: 'rejected' as PaymentStatus },
   ];
 
   if (loading) {
@@ -144,12 +169,26 @@ export default function Payments() {
         </div>
       )}
 
+      {/* Search */}
+      <div className="relative w-full sm:max-w-md animate-in animate-in-1">
+        <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#475569]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+        </svg>
+        <input
+          type="text"
+          placeholder="Search by customer name..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="form-input !pl-11"
+        />
+      </div>
+
       {/* Filter Tabs */}
       <div className="flex gap-2 flex-wrap animate-in animate-in-1">
         {filterButtons.map((btn) => (
           <button
             key={btn.value}
-            onClick={() => setFilter(btn.value)}
+            onClick={() => handleFilterChange(btn.value)}
             className="flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition-all duration-200"
             style={
               filter === btn.value
@@ -158,16 +197,6 @@ export default function Payments() {
             }
           >
             {btn.label}
-            <span
-              className="rounded-full px-2 py-0.5 text-xs font-bold"
-              style={
-                filter === btn.value
-                  ? { background: 'rgba(255,255,255,0.2)', color: '#fff' }
-                  : { background: 'rgba(148,163,184,0.1)', color: '#64748b' }
-              }
-            >
-              {btn.count}
-            </span>
           </button>
         ))}
       </div>
@@ -188,7 +217,7 @@ export default function Payments() {
               </tr>
             </thead>
             <tbody>
-              {filtered.length === 0 ? (
+              {payments.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="!text-center !py-16">
                     <div className="flex flex-col items-center gap-3">
@@ -200,7 +229,7 @@ export default function Payments() {
                   </td>
                 </tr>
               ) : (
-                filtered.map((payment) => (
+                payments.map((payment) => (
                   <tr key={payment.id}>
                     <td>
                       <div className="flex items-center gap-3">
@@ -267,7 +296,7 @@ export default function Payments() {
 
       {/* Mobile Card Layout */}
       <div className="md:hidden space-y-3 animate-in animate-in-2">
-        {filtered.length === 0 ? (
+        {payments.length === 0 ? (
           <div className="glass-card p-8 text-center">
             <svg className="w-12 h-12 text-[#334155] mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18.75a60.07 60.07 0 0 1 15.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 0 1 3 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 0 0-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 0 1-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 0 0 3 15h-.75M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm3 0h.008v.008H18V10.5Zm-12 0h.008v.008H6V10.5Z" />
@@ -275,7 +304,7 @@ export default function Payments() {
             <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, color: '#64748b' }}>No payments found</p>
           </div>
         ) : (
-          filtered.map((payment) => (
+          payments.map((payment) => (
             <div key={payment.id} className="glass-card p-4">
               <div className="flex items-start justify-between mb-3">
                 <div className="flex items-center gap-3">
@@ -330,6 +359,31 @@ export default function Payments() {
           ))
         )}
       </div>
+
+      {/* Pagination */}
+      {total > 0 && (
+        <div className="flex items-center justify-between mt-6">
+          <p className="text-sm" style={{ color: '#64748b', fontFamily: "'Outfit', sans-serif" }}>
+            Showing {Math.min((page - 1) * LIMIT + 1, total)}&ndash;{Math.min(page * LIMIT, total)} of {total}
+          </p>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              disabled={page <= 1}
+              className="btn-outline disabled:opacity-30"
+            >
+              Previous
+            </button>
+            <button
+              onClick={() => setPage(p => p + 1)}
+              disabled={page * LIMIT >= total}
+              className="btn-outline disabled:opacity-30"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

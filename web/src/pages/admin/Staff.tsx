@@ -18,6 +18,8 @@ const emptyForm: StaffForm = {
   email: '',
 };
 
+const LIMIT = 20;
+
 export default function Staff() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
@@ -27,11 +29,31 @@ export default function Staff() {
   const [form, setForm] = useState<StaffForm>(emptyForm);
   const [submitting, setSubmitting] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search);
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [search]);
 
   const fetchUsers = async () => {
     try {
-      const res = await api.get<User[]>('/users');
-      setUsers((res.data ?? []).filter((u) => u.role === 'admin' || u.role === 'technician'));
+      const params = new URLSearchParams({
+        page: String(page),
+        limit: String(LIMIT),
+      });
+      if (debouncedSearch) params.set('search', debouncedSearch);
+      const res = await api.get<{ data: User[]; total: number; page: number; limit: number }>(`/users?${params}`);
+      const allUsers = res.data.data ?? [];
+      const staffOnly = allUsers.filter((u) => u.role === 'admin' || u.role === 'technician');
+      setUsers(staffOnly);
+      setTotal(res.data.total ?? 0);
     } catch {
       setError('Failed to load staff');
     } finally {
@@ -40,8 +62,9 @@ export default function Staff() {
   };
 
   useEffect(() => {
+    setLoading(true);
     fetchUsers();
-  }, []);
+  }, [page, debouncedSearch]);
 
   const openAdd = () => {
     setForm(emptyForm);
@@ -138,6 +161,20 @@ export default function Staff() {
         </div>
       )}
 
+      {/* Search */}
+      <div className="relative w-full sm:max-w-md animate-in animate-in-1">
+        <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#475569]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+        </svg>
+        <input
+          type="text"
+          placeholder="Search by name or phone..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="form-input !pl-11"
+        />
+      </div>
+
       {/* Staff Table */}
       <div className="glass-card overflow-hidden animate-in animate-in-2">
         <div className="overflow-x-auto">
@@ -210,6 +247,31 @@ export default function Staff() {
           </table>
         </div>
       </div>
+
+      {/* Pagination */}
+      {total > 0 && (
+        <div className="flex items-center justify-between mt-6">
+          <p className="text-sm" style={{ color: '#64748b', fontFamily: "'Outfit', sans-serif" }}>
+            Showing {Math.min((page - 1) * LIMIT + 1, total)}&ndash;{Math.min(page * LIMIT, total)} of {total}
+          </p>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              disabled={page <= 1}
+              className="btn-outline disabled:opacity-30"
+            >
+              Previous
+            </button>
+            <button
+              onClick={() => setPage(p => p + 1)}
+              disabled={page * LIMIT >= total}
+              className="btn-outline disabled:opacity-30"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Add/Edit Modal */}
       {modalOpen && (

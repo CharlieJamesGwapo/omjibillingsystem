@@ -18,6 +18,8 @@ const emptyForm: SubForm = {
   billing_day: '1',
 };
 
+const LIMIT = 20;
+
 export default function Subscriptions() {
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [users, setUsers] = useState<User[]>([]);
@@ -28,16 +30,37 @@ export default function Subscriptions() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<SubForm>(emptyForm);
   const [submitting, setSubmitting] = useState(false);
+  const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [filter, setFilter] = useState<'all' | SubStatus>('all');
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search);
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [search]);
 
   const fetchData = async () => {
     try {
+      const params = new URLSearchParams({
+        page: String(page),
+        limit: String(LIMIT),
+      });
+      if (debouncedSearch) params.set('search', debouncedSearch);
+      if (filter !== 'all') params.set('status', filter);
+
       const [subsRes, usersRes, plansRes] = await Promise.all([
-        api.get<Subscription[]>('/subscriptions'),
+        api.get<{ data: Subscription[]; total: number; page: number; limit: number }>(`/subscriptions?${params}`),
         api.get<User[]>('/users'),
         api.get<Plan[]>('/plans'),
       ]);
-      setSubscriptions(subsRes.data ?? []);
-      setUsers((usersRes.data ?? []).filter((u) => u.role === 'customer'));
+      setSubscriptions(subsRes.data.data ?? []);
+      setTotal(subsRes.data.total ?? 0);
+      setUsers((usersRes.data ?? []).filter((u: User) => u.role === 'customer'));
       setPlans(plansRes.data ?? []);
     } catch {
       setError('Failed to load data');
@@ -47,8 +70,14 @@ export default function Subscriptions() {
   };
 
   useEffect(() => {
+    setLoading(true);
     fetchData();
-  }, []);
+  }, [page, debouncedSearch, filter]);
+
+  const handleFilterChange = (value: 'all' | SubStatus) => {
+    setFilter(value);
+    setPage(1);
+  };
 
   const formatCurrency = (amount: number) =>
     `₱${amount.toLocaleString('en-PH', { minimumFractionDigits: 2 })}`;
@@ -136,6 +165,13 @@ export default function Subscriptions() {
     }
   };
 
+  const filterButtons: { label: string; value: 'all' | SubStatus }[] = [
+    { label: 'All', value: 'all' },
+    { label: 'Active', value: 'active' as SubStatus },
+    { label: 'Overdue', value: 'overdue' as SubStatus },
+    { label: 'Suspended', value: 'suspended' as SubStatus },
+  ];
+
   if (loading) {
     return (
       <div className="space-y-6">
@@ -179,8 +215,40 @@ export default function Subscriptions() {
         </div>
       )}
 
+      {/* Search */}
+      <div className="relative w-full sm:max-w-md animate-in animate-in-1">
+        <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#475569]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+        </svg>
+        <input
+          type="text"
+          placeholder="Search by customer name or phone..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="form-input !pl-11"
+        />
+      </div>
+
+      {/* Status Filter Pills */}
+      <div className="flex gap-2 flex-wrap animate-in animate-in-1">
+        {filterButtons.map((btn) => (
+          <button
+            key={btn.value}
+            onClick={() => handleFilterChange(btn.value)}
+            className="flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition-all duration-200"
+            style={
+              filter === btn.value
+                ? { background: '#22d3ee', color: '#fff', fontFamily: "'Rajdhani', sans-serif", letterSpacing: '0.05em', fontSize: 13 }
+                : { background: 'rgba(15,26,46,0.6)', border: '1px solid rgba(34,211,238,0.06)', color: '#94a3b8', fontFamily: "'Rajdhani', sans-serif", letterSpacing: '0.05em', fontSize: 13 }
+            }
+          >
+            {btn.label}
+          </button>
+        ))}
+      </div>
+
       {/* Desktop Table */}
-      <div className="hidden lg:block glass-card animate-in animate-in-1">
+      <div className="hidden lg:block glass-card animate-in animate-in-2">
         <div className="overflow-x-auto">
           <table className="data-table">
             <thead>
@@ -388,6 +456,31 @@ export default function Subscriptions() {
           ))
         )}
       </div>
+
+      {/* Pagination */}
+      {total > 0 && (
+        <div className="flex items-center justify-between mt-6">
+          <p className="text-sm" style={{ color: '#64748b', fontFamily: "'Outfit', sans-serif" }}>
+            Showing {Math.min((page - 1) * LIMIT + 1, total)}&ndash;{Math.min(page * LIMIT, total)} of {total}
+          </p>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              disabled={page <= 1}
+              className="btn-outline disabled:opacity-30"
+            >
+              Previous
+            </button>
+            <button
+              onClick={() => setPage(p => p + 1)}
+              disabled={page * LIMIT >= total}
+              className="btn-outline disabled:opacity-30"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Modal */}
       {modalOpen && (

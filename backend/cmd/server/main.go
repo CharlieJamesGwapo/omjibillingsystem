@@ -110,10 +110,10 @@ func main() {
 
 	// ---- Handlers ----
 	authH := handler.NewAuthHandler(authSvc)
-	userH := handler.NewUserHandler(userSvc)
+	userH := handler.NewUserHandler(userSvc, userRepo)
 	planH := handler.NewPlanHandler(planSvc)
-	subH := handler.NewSubscriptionHandler(subSvc)
-	payH := handler.NewPaymentHandler(paymentSvc)
+	subH := handler.NewSubscriptionHandler(subSvc, subRepo)
+	payH := handler.NewPaymentHandler(paymentSvc, paymentRepo)
 	dashH := handler.NewDashboardHandler(dashSvc, logRepo)
 	mtH := handler.NewMikroTikHandler(mtManager, settingsRepo)
 	notifH := handler.NewNotificationHandler(subSvc, smsProvider)

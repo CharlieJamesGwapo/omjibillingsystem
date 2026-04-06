@@ -55,19 +55,31 @@ func (h *DashboardHandler) GetIncomeChart(w http.ResponseWriter, r *http.Request
 	writeJSON(w, http.StatusOK, chart)
 }
 
-// GetActivityLogs returns recent activity logs. Supports ?limit= query parameter (default 100).
+// GetActivityLogs returns recent activity logs with pagination.
+// Query params: ?page=1&limit=20
 func (h *DashboardHandler) GetActivityLogs(w http.ResponseWriter, r *http.Request) {
-	limit := 100
-	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
-		if n, err := strconv.Atoi(limitStr); err == nil && n > 0 {
-			limit = n
-		}
+	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+	if page < 1 {
+		page = 1
 	}
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	if limit < 1 {
+		limit = 20
+	}
+	if limit > 100 {
+		limit = 100
+	}
+	offset := (page - 1) * limit
 
-	logs, err := h.logRepo.List(r.Context(), limit)
+	logs, total, err := h.logRepo.ListPaginated(r.Context(), limit, offset)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to get activity logs")
 		return
 	}
-	writeJSON(w, http.StatusOK, logs)
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"data":  logs,
+		"total": total,
+		"page":  page,
+		"limit": limit,
+	})
 }

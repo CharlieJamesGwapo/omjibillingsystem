@@ -2,30 +2,54 @@ package handler
 
 import (
 	"net/http"
+	"strconv"
 
 	"github.com/jdns/billingsystem/internal/middleware"
 	"github.com/jdns/billingsystem/internal/model"
+	"github.com/jdns/billingsystem/internal/repository"
 	"github.com/jdns/billingsystem/internal/service"
 )
 
 // SubscriptionHandler handles subscription-related HTTP requests.
 type SubscriptionHandler struct {
 	subService *service.SubscriptionService
+	subRepo    *repository.SubscriptionRepo
 }
 
 // NewSubscriptionHandler creates a new SubscriptionHandler.
-func NewSubscriptionHandler(subService *service.SubscriptionService) *SubscriptionHandler {
-	return &SubscriptionHandler{subService: subService}
+func NewSubscriptionHandler(subService *service.SubscriptionService, subRepo *repository.SubscriptionRepo) *SubscriptionHandler {
+	return &SubscriptionHandler{subService: subService, subRepo: subRepo}
 }
 
-// List returns all subscriptions (admin/tech only).
+// List returns subscriptions with pagination and search support.
+// Query params: ?page=1&limit=20&search=&status=
 func (h *SubscriptionHandler) List(w http.ResponseWriter, r *http.Request) {
-	subs, err := h.subService.List(r.Context())
+	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+	if page < 1 {
+		page = 1
+	}
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	if limit < 1 {
+		limit = 20
+	}
+	if limit > 100 {
+		limit = 100
+	}
+	offset := (page - 1) * limit
+	search := r.URL.Query().Get("search")
+	status := r.URL.Query().Get("status")
+
+	subs, total, err := h.subRepo.ListPaginated(r.Context(), status, search, limit, offset)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to list subscriptions")
 		return
 	}
-	writeJSON(w, http.StatusOK, subs)
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"data":  subs,
+		"total": total,
+		"page":  page,
+		"limit": limit,
+	})
 }
 
 // GetByID retrieves a subscription. Customers may only view their own subscriptions.

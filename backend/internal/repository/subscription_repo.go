@@ -108,6 +108,59 @@ func (r *SubscriptionRepo) List(ctx context.Context) ([]*model.Subscription, err
 	return subs, rows.Err()
 }
 
+func (r *SubscriptionRepo) ListPaginated(ctx context.Context, status string, search string, limit, offset int) ([]*model.Subscription, int, error) {
+	where := []string{}
+	args := []interface{}{}
+	argIdx := 1
+
+	if status != "" {
+		where = append(where, fmt.Sprintf("s.status = $%d", argIdx))
+		args = append(args, status)
+		argIdx++
+	}
+	if search != "" {
+		where = append(where, fmt.Sprintf("(u.full_name ILIKE $%d OR u.phone ILIKE $%d)", argIdx, argIdx))
+		args = append(args, "%"+search+"%")
+		argIdx++
+	}
+
+	whereClause := ""
+	if len(where) > 0 {
+		whereClause = " WHERE " + strings.Join(where, " AND ")
+	}
+
+	// Count total
+	var total int
+	countQuery := "SELECT COUNT(*) FROM subscriptions s JOIN users u ON u.id = s.user_id JOIN plans p ON p.id = s.plan_id" + whereClause
+	if err := r.db.QueryRow(ctx, countQuery, args...).Scan(&total); err != nil {
+		return nil, 0, fmt.Errorf("count subscriptions: %w", err)
+	}
+
+	// Fetch paginated
+	dataQuery := subscriptionSelectJoin + whereClause +
+		fmt.Sprintf(" ORDER BY s.created_at DESC LIMIT $%d OFFSET $%d", argIdx, argIdx+1)
+	dataArgs := append(args, limit, offset)
+
+	rows, err := r.db.Query(ctx, dataQuery, dataArgs...)
+	if err != nil {
+		return nil, 0, fmt.Errorf("list subscriptions paginated: %w", err)
+	}
+	defer rows.Close()
+
+	var subs []*model.Subscription
+	for rows.Next() {
+		s, err := scanSubscription(rows)
+		if err != nil {
+			return nil, 0, fmt.Errorf("scan subscription: %w", err)
+		}
+		subs = append(subs, s)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, 0, err
+	}
+	return subs, total, nil
+}
+
 func (r *SubscriptionRepo) Update(ctx context.Context, id uuid.UUID, req *model.UpdateSubscriptionRequest) (*model.Subscription, error) {
 	setClauses := []string{}
 	args := []interface{}{}

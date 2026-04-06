@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -99,6 +100,59 @@ func (r *PaymentRepo) ListByUserID(ctx context.Context, userID uuid.UUID) ([]*mo
 		payments = append(payments, pay)
 	}
 	return payments, rows.Err()
+}
+
+func (r *PaymentRepo) ListPaginated(ctx context.Context, status string, search string, limit, offset int) ([]*model.Payment, int, error) {
+	where := []string{}
+	args := []interface{}{}
+	argIdx := 1
+
+	if status != "" {
+		where = append(where, fmt.Sprintf("p.status = $%d", argIdx))
+		args = append(args, status)
+		argIdx++
+	}
+	if search != "" {
+		where = append(where, fmt.Sprintf("(u.full_name ILIKE $%d OR u.phone ILIKE $%d)", argIdx, argIdx))
+		args = append(args, "%"+search+"%")
+		argIdx++
+	}
+
+	whereClause := ""
+	if len(where) > 0 {
+		whereClause = " WHERE " + strings.Join(where, " AND ")
+	}
+
+	// Count total
+	var total int
+	countQuery := "SELECT COUNT(*) FROM payments p JOIN users u ON u.id = p.user_id LEFT JOIN users a ON a.id = p.approved_by" + whereClause
+	if err := r.db.QueryRow(ctx, countQuery, args...).Scan(&total); err != nil {
+		return nil, 0, fmt.Errorf("count payments: %w", err)
+	}
+
+	// Fetch paginated
+	dataQuery := paymentSelectJoin + whereClause +
+		fmt.Sprintf(" ORDER BY p.created_at DESC LIMIT $%d OFFSET $%d", argIdx, argIdx+1)
+	dataArgs := append(args, limit, offset)
+
+	rows, err := r.db.Query(ctx, dataQuery, dataArgs...)
+	if err != nil {
+		return nil, 0, fmt.Errorf("list payments paginated: %w", err)
+	}
+	defer rows.Close()
+
+	var payments []*model.Payment
+	for rows.Next() {
+		pay, err := scanPayment(rows)
+		if err != nil {
+			return nil, 0, fmt.Errorf("scan payment: %w", err)
+		}
+		payments = append(payments, pay)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, 0, err
+	}
+	return payments, total, nil
 }
 
 func (r *PaymentRepo) Approve(ctx context.Context, id uuid.UUID, req *model.ApproveRejectRequest) (*model.Payment, error) {
