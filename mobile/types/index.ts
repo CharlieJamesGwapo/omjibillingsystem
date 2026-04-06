@@ -1,0 +1,98 @@
+// ── Enums / Union Types ──
+
+export type UserRole = 'admin' | 'technician' | 'customer';
+export type UserStatus = 'active' | 'inactive';
+export type SubscriptionStatus = 'active' | 'overdue' | 'suspended';
+export type PaymentMethod = 'gcash' | 'maya' | 'bank' | 'cash';
+export type PaymentStatus = 'pending' | 'approved' | 'rejected';
+
+// ── Core Models ──
+
+export interface User {
+  id: string;
+  phone: string;
+  full_name: string;
+  email?: string;
+  address?: string;
+  role: UserRole;
+  status: UserStatus;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Plan {
+  id: string;
+  name: string;
+  speed_mbps: number;
+  price: number;
+  description?: string;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface Subscription {
+  id: string;
+  user_id: string;
+  plan_id: string;
+  ip_address?: string;
+  mac_address?: string;
+  billing_day: number;
+  next_due_date: string;
+  grace_days: number;
+  status: SubscriptionStatus;
+  mikrotik_queue_id?: string;
+  created_at: string;
+  updated_at: string;
+  // Joined fields
+  user_name?: string;
+  user_phone?: string;
+  plan_name?: string;
+  plan_speed?: number;
+  plan_price?: number;
+}
+
+export interface Payment {
+  id: string;
+  user_id: string;
+  subscription_id: string;
+  amount: number;
+  method: PaymentMethod;
+  reference_number?: string;
+  proof_image_url?: string;
+  status: PaymentStatus;
+  approved_by?: string;
+  billing_period_start: string;
+  billing_period_end: string;
+  notes?: string;
+  created_at: string;
+  updated_at: string;
+  // Joined fields
+  user_name?: string;
+  user_phone?: string;
+  approver_name?: string;
+}
+
+// ── Dashboard ──
+
+export interface DashboardStats {
+  total_customers: number;
+  active: number;
+  overdue: number;
+  suspended: number;
+  monthly_income: number;
+  expected_income: number;
+  pending_payments: number;
+}
+
+// ── Auth ──
+
+export interface TokenPair {
+  access_token: string;
+  refresh_token: string;
+  expires_at: string;
+}
+
+export interface LoginResponse {
+  tokens: TokenPair;
+  user: User;
+}
