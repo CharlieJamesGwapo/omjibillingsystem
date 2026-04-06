@@ -44,6 +44,18 @@ func (r *PlanRepo) GetByID(ctx context.Context, id uuid.UUID) (*model.Plan, erro
 	return p, nil
 }
 
+func (r *PlanRepo) GetByName(ctx context.Context, name string) (*model.Plan, error) {
+	p := &model.Plan{}
+	err := r.db.QueryRow(ctx, `
+		SELECT id, name, speed_mbps, price, description, is_active, created_at
+		FROM plans WHERE name = $1`, name,
+	).Scan(&p.ID, &p.Name, &p.SpeedMbps, &p.Price, &p.Description, &p.IsActive, &p.CreatedAt)
+	if err != nil {
+		return nil, fmt.Errorf("get plan by name: %w", err)
+	}
+	return p, nil
+}
+
 func (r *PlanRepo) List(ctx context.Context, activeOnly bool) ([]*model.Plan, error) {
 	query := `SELECT id, name, speed_mbps, price, description, is_active, created_at FROM plans`
 	if activeOnly {

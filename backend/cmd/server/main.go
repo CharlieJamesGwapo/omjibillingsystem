@@ -1,11 +1,13 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 
 	"github.com/jdns/billingsystem/internal/config"
 	"github.com/jdns/billingsystem/internal/cron"
@@ -43,22 +45,65 @@ func main() {
 	paymentRepo := repository.NewPaymentRepo(pool)
 	dashRepo := repository.NewDashboardRepo(pool)
 	logRepo := repository.NewActivityLogRepo(pool)
+	settingsRepo := repository.NewSettingsRepo(pool)
 
 	// ---- SMS Provider ----
-	smsProvider := sms.NewMockProvider()
+	// Check DB settings first, fall back to .env values
+	smsProviderName := cfg.SMSProvider
+	smsAPIKey := cfg.SMSAPIKey
+	smsBaseURL := cfg.SMSBaseURL
 
-	// ---- MikroTik Client ----
-	var mtClient *mikrotik.Client
-	if cfg.MikroTikHost != "" {
-		mtAddr := fmt.Sprintf("%s:%d", cfg.MikroTikHost, cfg.MikroTikPort)
-		mtClient = mikrotik.NewClient(mtAddr, cfg.MikroTikUser, cfg.MikroTikPass)
+	if dbProvider, err := settingsRepo.Get(context.Background(), "sms_provider"); err == nil && dbProvider != "" {
+		smsProviderName = dbProvider
+		log.Println("[SMS] Using provider from DB settings:", dbProvider)
 	}
+	if dbKey, err := settingsRepo.Get(context.Background(), "sms_api_key"); err == nil && dbKey != "" {
+		smsAPIKey = dbKey
+		log.Println("[SMS] Using API key from DB settings")
+	}
+	if dbURL, err := settingsRepo.Get(context.Background(), "sms_base_url"); err == nil && dbURL != "" {
+		smsBaseURL = dbURL
+		log.Println("[SMS] Using base URL from DB settings")
+	}
+
+	smsProvider := sms.NewProviderFromSettings(smsProviderName, smsAPIKey, smsBaseURL)
+
+	// ---- MikroTik Manager ----
+	// Check DB settings first, then fall back to .env
+	var initialMTClient *mikrotik.Client
+	mtHost := cfg.MikroTikHost
+	mtPort := cfg.MikroTikPort
+	mtUser := cfg.MikroTikUser
+	mtPass := cfg.MikroTikPass
+
+	if dbHost, err := settingsRepo.Get(context.Background(), "mikrotik_host"); err == nil && dbHost != "" {
+		mtHost = dbHost
+		log.Println("[MikroTik] Using host from DB settings:", dbHost)
+	}
+	if dbPort, err := settingsRepo.Get(context.Background(), "mikrotik_port"); err == nil && dbPort != "" {
+		if p, err := strconv.Atoi(dbPort); err == nil {
+			mtPort = p
+		}
+	}
+	if dbUser, err := settingsRepo.Get(context.Background(), "mikrotik_user"); err == nil && dbUser != "" {
+		mtUser = dbUser
+	}
+	if dbPass, err := settingsRepo.Get(context.Background(), "mikrotik_password"); err == nil && dbPass != "" {
+		mtPass = dbPass
+	}
+
+	if mtHost != "" {
+		mtAddr := fmt.Sprintf("%s:%d", mtHost, mtPort)
+		initialMTClient = mikrotik.NewClient(mtAddr, mtUser, mtPass)
+		log.Printf("[MikroTik] Configured for %s", mtAddr)
+	}
+	mtManager := mikrotik.NewManager(initialMTClient)
 
 	// ---- Services ----
 	authSvc := service.NewAuthService(userRepo, otpRepo, smsProvider, cfg.JWTSecret, cfg.JWTRefreshSecret)
 	userSvc := service.NewUserService(userRepo, authSvc)
 	planSvc := service.NewPlanService(planRepo)
-	subSvc := service.NewSubscriptionService(subRepo, planRepo, mtClient)
+	subSvc := service.NewSubscriptionService(subRepo, planRepo, mtManager)
 	paymentSvc := service.NewPaymentService(paymentRepo, subRepo, subSvc)
 	dashSvc := service.NewDashboardService(dashRepo, logRepo)
 
@@ -69,8 +114,9 @@ func main() {
 	subH := handler.NewSubscriptionHandler(subSvc)
 	payH := handler.NewPaymentHandler(paymentSvc)
 	dashH := handler.NewDashboardHandler(dashSvc, logRepo)
-	mtH := handler.NewMikroTikHandler(mtClient)
+	mtH := handler.NewMikroTikHandler(mtManager, settingsRepo)
 	notifH := handler.NewNotificationHandler(subSvc, smsProvider)
+	settingsH := handler.NewSettingsHandler(settingsRepo, smsProvider)
 
 	// ---- Cron Scheduler ----
 	scheduler := cron.NewScheduler(subSvc, smsProvider)
@@ -86,12 +132,13 @@ func main() {
 		SubHandler:   subH,
 		PayHandler:   payH,
 		DashHandler:  dashH,
-		MTHandler:    mtH,
-		NotifHandler: notifH,
+		MTHandler:       mtH,
+		NotifHandler:    notifH,
+		SettingsHandler: settingsH,
 	}, cfg.CORSOrigins)
 
 	addr := ":" + cfg.Port
-	log.Printf("JDNS Billing API starting on %s", addr)
+	log.Printf("OMJI Billing API starting on %s", addr)
 	if err := http.ListenAndServe(addr, h); err != nil {
 		log.Fatalf("Server failed: %v", err)
 		os.Exit(1)

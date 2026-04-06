@@ -18,8 +18,9 @@ type Deps struct {
 	SubHandler   *handler.SubscriptionHandler
 	PayHandler   *handler.PaymentHandler
 	DashHandler  *handler.DashboardHandler
-	MTHandler    *handler.MikroTikHandler
-	NotifHandler *handler.NotificationHandler
+	MTHandler       *handler.MikroTikHandler
+	NotifHandler    *handler.NotificationHandler
+	SettingsHandler *handler.SettingsHandler
 }
 
 // New builds and returns the fully wired HTTP handler with all routes and middleware.
@@ -83,11 +84,19 @@ func New(deps Deps, corsOrigins string) http.Handler {
 	// --- Dashboard ---
 	mux.Handle("GET /api/dashboard/stats", chain(deps.DashHandler.GetStats, authMW, adminOnly))
 	mux.Handle("GET /api/dashboard/income", chain(deps.DashHandler.GetIncomeReport, authMW, adminOnly))
+	mux.Handle("GET /api/dashboard/chart", chain(deps.DashHandler.GetIncomeChart, authMW, adminOrTech))
 	mux.Handle("GET /api/dashboard/logs", chain(deps.DashHandler.GetActivityLogs, authMW, adminOnly))
 
 	// --- MikroTik ---
 	mux.Handle("GET /api/mikrotik/status", chain(deps.MTHandler.GetStatus, authMW, adminOnly))
 	mux.Handle("GET /api/mikrotik/connections", chain(deps.MTHandler.GetActiveConnections, authMW, adminOrTech))
+	mux.Handle("POST /api/mikrotik/test", chain(deps.MTHandler.TestConnection, authMW, adminOnly))
+	mux.Handle("POST /api/mikrotik/connect", chain(deps.MTHandler.SaveAndConnect, authMW, adminOnly))
+
+	// --- Settings ---
+	mux.Handle("GET /api/settings", chain(deps.SettingsHandler.GetSettings, authMW, adminOnly))
+	mux.Handle("PUT /api/settings", chain(deps.SettingsHandler.UpdateSettings, authMW, adminOnly))
+	mux.Handle("POST /api/settings/test-sms", chain(deps.SettingsHandler.TestSMS, authMW, adminOnly))
 
 	// --- Notifications ---
 	mux.Handle("POST /api/notifications/send-reminders", chain(deps.NotifHandler.SendReminders, authMW, adminOnly))

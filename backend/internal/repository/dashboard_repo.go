@@ -91,6 +91,43 @@ func (r *DashboardRepo) GetStats(ctx context.Context) (*DashboardStats, error) {
 	return stats, nil
 }
 
+// IncomeChartEntry represents monthly income data for charting.
+type IncomeChartEntry struct {
+	Month  string  `json:"month"`
+	Label  string  `json:"label"`
+	Income float64 `json:"income"`
+	Count  int     `json:"count"`
+}
+
+// GetIncomeChart returns monthly income aggregated over the last 12 months.
+func (r *DashboardRepo) GetIncomeChart(ctx context.Context) ([]*IncomeChartEntry, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT
+			TO_CHAR(created_at, 'YYYY-MM') as month,
+			TO_CHAR(created_at, 'Mon YYYY') as label,
+			COALESCE(SUM(amount), 0) as income,
+			COUNT(*) as count
+		FROM payments
+		WHERE status = 'approved'
+			AND created_at >= NOW() - INTERVAL '12 months'
+		GROUP BY month, label
+		ORDER BY month DESC`)
+	if err != nil {
+		return nil, fmt.Errorf("get income chart: %w", err)
+	}
+	defer rows.Close()
+
+	var entries []*IncomeChartEntry
+	for rows.Next() {
+		e := &IncomeChartEntry{}
+		if err := rows.Scan(&e.Month, &e.Label, &e.Income, &e.Count); err != nil {
+			return nil, fmt.Errorf("scan income chart entry: %w", err)
+		}
+		entries = append(entries, e)
+	}
+	return entries, rows.Err()
+}
+
 func (r *DashboardRepo) GetIncomeReport(ctx context.Context) ([]*IncomeReport, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT DATE_TRUNC('day', created_at) AS day, SUM(amount), COUNT(*)

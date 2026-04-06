@@ -30,6 +30,15 @@ func (s *DashboardService) GetStats(ctx context.Context) (*repository.DashboardS
 	return stats, nil
 }
 
+// GetIncomeChart returns monthly income data for the last 12 months.
+func (s *DashboardService) GetIncomeChart(ctx context.Context) ([]*repository.IncomeChartEntry, error) {
+	chart, err := s.dashRepo.GetIncomeChart(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("get income chart: %w", err)
+	}
+	return chart, nil
+}
+
 // GetIncomeReport returns daily income totals for approved payments.
 func (s *DashboardService) GetIncomeReport(ctx context.Context) ([]*repository.IncomeReport, error) {
 	report, err := s.dashRepo.GetIncomeReport(ctx)

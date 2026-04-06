@@ -45,6 +45,16 @@ func (h *DashboardHandler) GetIncomeReport(w http.ResponseWriter, r *http.Reques
 	writeJSON(w, http.StatusOK, report)
 }
 
+// GetIncomeChart returns monthly income for the last 12 months.
+func (h *DashboardHandler) GetIncomeChart(w http.ResponseWriter, r *http.Request) {
+	chart, err := h.dashService.GetIncomeChart(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to get income chart")
+		return
+	}
+	writeJSON(w, http.StatusOK, chart)
+}
+
 // GetActivityLogs returns recent activity logs. Supports ?limit= query parameter (default 100).
 func (h *DashboardHandler) GetActivityLogs(w http.ResponseWriter, r *http.Request) {
 	limit := 100

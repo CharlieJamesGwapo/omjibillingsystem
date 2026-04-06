@@ -17,6 +17,7 @@ type Config struct {
 	MikroTikPass    string
 	SMSProvider     string
 	SMSAPIKey       string
+	SMSBaseURL      string
 	R2AccountID     string
 	R2AccessKey     string
 	R2SecretKey     string
@@ -51,6 +52,7 @@ func Load() (*Config, error) {
 		MikroTikPass:     os.Getenv("MIKROTIK_PASSWORD"),
 		SMSProvider:      os.Getenv("SMS_PROVIDER"),
 		SMSAPIKey:        os.Getenv("SMS_API_KEY"),
+		SMSBaseURL:       os.Getenv("SMS_BASE_URL"),
 		R2AccountID:      os.Getenv("R2_ACCOUNT_ID"),
 		R2AccessKey:      os.Getenv("R2_ACCESS_KEY"),
 		R2SecretKey:      os.Getenv("R2_SECRET_KEY"),

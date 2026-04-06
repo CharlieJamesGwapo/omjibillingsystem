@@ -13,21 +13,21 @@ import (
 
 // SubscriptionService handles business logic for customer subscriptions.
 type SubscriptionService struct {
-	subRepo  *repository.SubscriptionRepo
-	planRepo *repository.PlanRepo
-	mtClient *mikrotik.Client
+	subRepo   *repository.SubscriptionRepo
+	planRepo  *repository.PlanRepo
+	mtManager *mikrotik.Manager
 }
 
 // NewSubscriptionService creates a new SubscriptionService.
 func NewSubscriptionService(
 	subRepo *repository.SubscriptionRepo,
 	planRepo *repository.PlanRepo,
-	mtClient *mikrotik.Client,
+	mtManager *mikrotik.Manager,
 ) *SubscriptionService {
 	return &SubscriptionService{
-		subRepo:  subRepo,
-		planRepo: planRepo,
-		mtClient: mtClient,
+		subRepo:   subRepo,
+		planRepo:  planRepo,
+		mtManager: mtManager,
 	}
 }
 
@@ -61,12 +61,13 @@ func (s *SubscriptionService) Create(ctx context.Context, req *model.CreateSubsc
 	}
 
 	// Create MikroTik queue if IP provided and client is available
-	if req.IPAddress != nil && *req.IPAddress != "" && s.mtClient != nil {
+	mtClient := s.mtManager.Get()
+	if req.IPAddress != nil && *req.IPAddress != "" && mtClient != nil {
 		plan, err := s.planRepo.GetByID(ctx, req.PlanID)
 		if err == nil {
-			speed := s.mtClient.SpeedString(plan.SpeedMbps)
+			speed := mtClient.SpeedString(plan.SpeedMbps)
 			queueName := fmt.Sprintf("sub-%s", sub.ID.String())
-			queueID, err := s.mtClient.CreateQueue(queueName, *req.IPAddress, speed, speed)
+			queueID, err := mtClient.CreateQueue(queueName, *req.IPAddress, speed, speed)
 			if err == nil && queueID != "" {
 				_ = s.subRepo.UpdateMikroTikQueueID(ctx, sub.ID, &queueID)
 				sub.MikroTikQueueID = &queueID
@@ -120,8 +121,8 @@ func (s *SubscriptionService) Disconnect(ctx context.Context, id uuid.UUID) erro
 		return fmt.Errorf("get subscription: %w", err)
 	}
 
-	if s.mtClient != nil && sub.MikroTikQueueID != nil && *sub.MikroTikQueueID != "" {
-		if err := s.mtClient.DisableQueue(*sub.MikroTikQueueID); err != nil {
+	if mtClient := s.mtManager.Get(); mtClient != nil && sub.MikroTikQueueID != nil && *sub.MikroTikQueueID != "" {
+		if err := mtClient.DisableQueue(*sub.MikroTikQueueID); err != nil {
 			return fmt.Errorf("disable mikrotik queue: %w", err)
 		}
 	}
@@ -139,8 +140,8 @@ func (s *SubscriptionService) Reconnect(ctx context.Context, id uuid.UUID) error
 		return fmt.Errorf("get subscription: %w", err)
 	}
 
-	if s.mtClient != nil && sub.MikroTikQueueID != nil && *sub.MikroTikQueueID != "" {
-		if err := s.mtClient.EnableQueue(*sub.MikroTikQueueID); err != nil {
+	if mtClient := s.mtManager.Get(); mtClient != nil && sub.MikroTikQueueID != nil && *sub.MikroTikQueueID != "" {
+		if err := mtClient.EnableQueue(*sub.MikroTikQueueID); err != nil {
 			return fmt.Errorf("enable mikrotik queue: %w", err)
 		}
 	}
