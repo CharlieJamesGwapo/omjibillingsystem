@@ -10,6 +10,7 @@ const Customers = React.lazy(() => import('./pages/admin/Customers'));
 const Plans = React.lazy(() => import('./pages/admin/Plans'));
 const Subscriptions = React.lazy(() => import('./pages/admin/Subscriptions'));
 const Payments = React.lazy(() => import('./pages/admin/Payments'));
+const Messages = React.lazy(() => import('./pages/admin/Messages'));
 const MikroTik = React.lazy(() => import('./pages/admin/MikroTik'));
 const ActivityLogs = React.lazy(() => import('./pages/admin/ActivityLogs'));
 const Reports = React.lazy(() => import('./pages/admin/Reports'));
@@ -57,6 +58,7 @@ export default function App() {
               <Route path="plans" element={<Plans />} />
               <Route path="subscriptions" element={<Subscriptions />} />
               <Route path="payments" element={<Payments />} />
+              <Route path="messages" element={<Messages />} />
               <Route path="mikrotik" element={<MikroTik />} />
               <Route path="activity-logs" element={<ActivityLogs />} />
               <Route path="reports" element={<Reports />} />

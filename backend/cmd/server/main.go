@@ -46,6 +46,7 @@ func main() {
 	dashRepo := repository.NewDashboardRepo(pool)
 	logRepo := repository.NewActivityLogRepo(pool)
 	settingsRepo := repository.NewSettingsRepo(pool)
+	messageRepo := repository.NewMessageRepo(pool)
 
 	// ---- SMS Provider ----
 	// Check DB settings first, fall back to .env values
@@ -117,6 +118,7 @@ func main() {
 	mtH := handler.NewMikroTikHandler(mtManager, settingsRepo)
 	notifH := handler.NewNotificationHandler(subSvc, smsProvider)
 	settingsH := handler.NewSettingsHandler(settingsRepo, smsProvider)
+	msgH := handler.NewMessageHandler(messageRepo, userRepo, subSvc, settingsRepo)
 
 	// ---- Cron Scheduler ----
 	scheduler := cron.NewScheduler(subSvc, smsProvider)
@@ -135,6 +137,7 @@ func main() {
 		MTHandler:       mtH,
 		NotifHandler:    notifH,
 		SettingsHandler: settingsH,
+		MsgHandler:      msgH,
 	}, cfg.CORSOrigins)
 
 	addr := ":" + cfg.Port

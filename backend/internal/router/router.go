@@ -21,6 +21,7 @@ type Deps struct {
 	MTHandler       *handler.MikroTikHandler
 	NotifHandler    *handler.NotificationHandler
 	SettingsHandler *handler.SettingsHandler
+	MsgHandler      *handler.MessageHandler
 }
 
 // New builds and returns the fully wired HTTP handler with all routes and middleware.
@@ -100,6 +101,15 @@ func New(deps Deps, corsOrigins string) http.Handler {
 
 	// --- Notifications ---
 	mux.Handle("POST /api/notifications/send-reminders", chain(deps.NotifHandler.SendReminders, authMW, adminOnly))
+
+	// --- Messages ---
+	mux.Handle("POST /api/messages/send", chain(deps.MsgHandler.SendToOne, authMW, adminOnly))
+	mux.Handle("POST /api/messages/bulk", chain(deps.MsgHandler.SendBulk, authMW, adminOnly))
+	mux.Handle("POST /api/messages/template", chain(deps.MsgHandler.SendTemplate, authMW, adminOnly))
+	mux.Handle("POST /api/messages/reminders", chain(deps.MsgHandler.SendReminders, authMW, adminOnly))
+	mux.Handle("GET /api/messages", chain(deps.MsgHandler.GetHistory, authMW, adminOnly))
+	mux.Handle("GET /api/messages/templates", chain(deps.MsgHandler.GetTemplates, authMW, adminOnly))
+	mux.Handle("PUT /api/messages/templates/{id}", chain(deps.MsgHandler.UpdateTemplate, authMW, adminOnly))
 
 	return corsMiddleware(mux, corsOrigins)
 }
