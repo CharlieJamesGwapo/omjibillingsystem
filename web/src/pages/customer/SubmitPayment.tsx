@@ -74,6 +74,8 @@ export default function SubmitPayment() {
   const [billingStart, setBillingStart] = useState('');
   const [billingEnd, setBillingEnd] = useState('');
   const [notes, setNotes] = useState('');
+  const [proofFile, setProofFile] = useState<File | null>(null);
+  const [proofPreview, setProofPreview] = useState<string | null>(null);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
@@ -147,14 +149,18 @@ export default function SubmitPayment() {
     setSubmitting(true);
 
     try {
-      await api.post('/payments', {
-        subscription_id: Number(subscriptionId),
-        amount: Number(amount),
-        method,
-        reference_number: referenceNumber || undefined,
-        billing_period_start: billingStart,
-        billing_period_end: billingEnd,
-        notes: notes || undefined,
+      const formData = new FormData();
+      formData.append('subscription_id', subscriptionId);
+      formData.append('amount', String(amount));
+      formData.append('method', method);
+      if (referenceNumber) formData.append('reference_number', referenceNumber);
+      if (billingStart) formData.append('billing_period_start', billingStart);
+      if (billingEnd) formData.append('billing_period_end', billingEnd);
+      if (notes) formData.append('notes', notes);
+      if (proofFile) formData.append('proof_image', proofFile);
+
+      await api.post('/payments', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
       });
       setSuccess(true);
     } catch {
@@ -435,7 +441,48 @@ export default function SubmitPayment() {
             </div>
           </div>
 
-          {/* ── Step 6: Notes ── */}
+          {/* ── Step 6: Proof of Payment ── */}
+          <div className="space-y-2">
+            <label className="form-label">
+              Proof of Payment <span className="font-body font-normal text-text-secondary/60 normal-case tracking-normal">(optional)</span>
+            </label>
+            {proofPreview ? (
+              <div className="relative rounded-xl overflow-hidden border border-border">
+                <img src={proofPreview} alt="Proof" className="w-full max-h-48 object-cover" />
+                <button
+                  type="button"
+                  onClick={() => { setProofFile(null); setProofPreview(null); }}
+                  className="absolute top-2 right-2 h-8 w-8 rounded-full bg-bg-deep/80 flex items-center justify-center hover:bg-destructive/30 transition-colors cursor-pointer"
+                >
+                  <svg className="h-4 w-4 text-destructive" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            ) : (
+              <label className="glass-card flex flex-col items-center justify-center gap-3 py-10 cursor-pointer hover:border-secondary/20 transition-colors">
+                <svg className="h-8 w-8 text-text-secondary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z" />
+                </svg>
+                <span className="text-sm text-text-secondary">Click to upload proof of payment</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      setProofFile(file);
+                      setProofPreview(URL.createObjectURL(file));
+                    }
+                  }}
+                />
+              </label>
+            )}
+          </div>
+
+          {/* ── Step 7: Notes ── */}
           <div className="space-y-2">
             <label className="form-label">
               Notes <span className="font-body font-normal text-text-secondary/60 normal-case tracking-normal">(optional)</span>

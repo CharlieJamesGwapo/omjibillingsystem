@@ -14,6 +14,7 @@ export default function Payments() {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
+  const [proofModal, setProofModal] = useState<string | null>(null);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -211,6 +212,7 @@ export default function Payments() {
                 <th>Amount</th>
                 <th>Method</th>
                 <th>Reference</th>
+                <th>Proof</th>
                 <th>Status</th>
                 <th>Date</th>
                 <th>Actions</th>
@@ -219,7 +221,7 @@ export default function Payments() {
             <tbody>
               {payments.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="!text-center !py-16">
+                  <td colSpan={8} className="!text-center !py-16">
                     <div className="flex flex-col items-center gap-3">
                       <svg className="w-12 h-12 text-[#334155]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18.75a60.07 60.07 0 0 1 15.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 0 1 3 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 0 0-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 0 1-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 0 0 3 15h-.75M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm3 0h.008v.008H18V10.5Zm-12 0h.008v.008H6V10.5Z" />
@@ -253,6 +255,18 @@ export default function Payments() {
                         <span className="font-mono text-xs px-2 py-1 rounded" style={{ background: 'rgba(15,23,41,0.8)', color: '#64748b' }}>
                           {payment.reference_number}
                         </span>
+                      ) : (
+                        <span className="text-[#334155]">--</span>
+                      )}
+                    </td>
+                    <td>
+                      {payment.proof_image_url ? (
+                        <button
+                          onClick={() => setProofModal(payment.proof_image_url!)}
+                          className="h-8 w-8 rounded-lg overflow-hidden border border-border hover:border-secondary/30 transition-colors cursor-pointer"
+                        >
+                          <img src={payment.proof_image_url} alt="Proof" className="h-full w-full object-cover" />
+                        </button>
                       ) : (
                         <span className="text-[#334155]">--</span>
                       )}
@@ -332,6 +346,14 @@ export default function Payments() {
                   {payment.reference_number}
                 </p>
               )}
+              {payment.proof_image_url && (
+                <button
+                  onClick={() => setProofModal(payment.proof_image_url!)}
+                  className="block mb-3 rounded-lg overflow-hidden border border-border hover:border-secondary/30 transition-colors cursor-pointer"
+                >
+                  <img src={payment.proof_image_url} alt="Proof" className="w-full max-h-32 object-cover" />
+                </button>
+              )}
               {payment.status === 'pending' && (
                 <div className="flex gap-2 pt-3" style={{ borderTop: '1px solid rgba(34,211,238,0.06)' }}>
                   <button
@@ -381,6 +403,18 @@ export default function Payments() {
             >
               Next
             </button>
+          </div>
+        </div>
+      )}
+      {/* Proof Image Modal */}
+      {proofModal && (
+        <div className="modal-overlay" onClick={() => setProofModal(null)}>
+          <div className="modal-content !max-w-lg !p-4" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-heading text-sm font-bold text-text-primary uppercase tracking-wider">Proof of Payment</h3>
+              <button onClick={() => setProofModal(null)} className="text-text-secondary hover:text-text-primary cursor-pointer">&times;</button>
+            </div>
+            <img src={proofModal} alt="Proof of Payment" className="w-full rounded-lg" />
           </div>
         </div>
       )}

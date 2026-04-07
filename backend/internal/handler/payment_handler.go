@@ -94,6 +94,15 @@ func (h *PaymentHandler) Create(w http.ResponseWriter, r *http.Request) {
 		}
 		req.SubscriptionID = subID
 
+		if amountStr := r.FormValue("amount"); amountStr != "" {
+			amount, err := strconv.ParseFloat(amountStr, 64)
+			if err != nil {
+				writeError(w, http.StatusBadRequest, "invalid amount")
+				return
+			}
+			req.Amount = amount
+		}
+
 		methodStr := r.FormValue("method")
 		if methodStr == "" {
 			writeError(w, http.StatusBadRequest, "method is required")
