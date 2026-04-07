@@ -112,6 +112,9 @@ func New(deps Deps, corsOrigins string) http.Handler {
 	mux.Handle("GET /api/messages/templates", chain(deps.MsgHandler.GetTemplates, authMW, adminOnly))
 	mux.Handle("PUT /api/messages/templates/{id}", chain(deps.MsgHandler.UpdateTemplate, authMW, adminOnly))
 
+	// --- Static uploads ---
+	mux.Handle("GET /api/uploads/", http.StripPrefix("/api/uploads/", http.FileServer(http.Dir("uploads"))))
+
 	return corsMiddleware(mux, corsOrigins)
 }
 

@@ -1,1 +1,6 @@
 .superpowers/
+backend/.env
+backend/server
+backend/seed
+backend/uploads/
+backend/package-lock.json

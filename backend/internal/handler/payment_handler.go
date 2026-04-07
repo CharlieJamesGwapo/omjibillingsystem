@@ -2,9 +2,15 @@ package handler
 
 import (
 	"errors"
+	"fmt"
+	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
+	"time"
 
+	"github.com/google/uuid"
 	"github.com/jdns/billingsystem/internal/middleware"
 	"github.com/jdns/billingsystem/internal/model"
 	"github.com/jdns/billingsystem/internal/repository"
@@ -99,8 +105,39 @@ func (h *PaymentHandler) Create(w http.ResponseWriter, r *http.Request) {
 			req.ReferenceNumber = &ref
 		}
 
-		// TODO: handle actual file upload to R2; for now store nil
-		req.ProofImageURL = nil
+		// Handle proof image upload
+		file, header, err := r.FormFile("proof_image")
+		if err == nil {
+			defer file.Close()
+
+			uploadsDir := "uploads/proofs"
+			if err := os.MkdirAll(uploadsDir, 0755); err != nil {
+				writeError(w, http.StatusInternalServerError, "failed to create uploads directory")
+				return
+			}
+
+			ext := filepath.Ext(header.Filename)
+			if ext == "" {
+				ext = ".jpg"
+			}
+			filename := fmt.Sprintf("%s_%d%s", uuid.New().String(), time.Now().Unix(), ext)
+			filePath := filepath.Join(uploadsDir, filename)
+
+			dst, err := os.Create(filePath)
+			if err != nil {
+				writeError(w, http.StatusInternalServerError, "failed to save image")
+				return
+			}
+			defer dst.Close()
+
+			if _, err := io.Copy(dst, file); err != nil {
+				writeError(w, http.StatusInternalServerError, "failed to write image")
+				return
+			}
+
+			url := "/api/uploads/proofs/" + filename
+			req.ProofImageURL = &url
+		}
 	} else {
 		if err := decodeJSON(r, &req); err != nil {
 			writeError(w, http.StatusBadRequest, "invalid request body")
