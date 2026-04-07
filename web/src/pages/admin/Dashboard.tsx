@@ -41,15 +41,15 @@ export default function Dashboard() {
       try {
         const [statsRes, paymentsRes, chartRes, logsRes] = await Promise.all([
           api.get<DashboardStats>('/dashboard/stats'),
-          api.get<Payment[]>('/payments'),
+          api.get<{ data: Payment[]; total: number }>('/payments?page=1&limit=5').catch(() => ({ data: { data: [], total: 0 } })),
           api.get<ChartData[]>('/dashboard/chart').catch(() => ({ data: [] })),
-          api.get<ActivityLog[]>('/dashboard/logs').catch(() => ({ data: [] })),
+          api.get<{ data: ActivityLog[]; total: number }>('/dashboard/logs?page=1&limit=10').catch(() => ({ data: { data: [], total: 0 } })),
         ]);
         setStats(statsRes.data);
-        setPayments((paymentsRes.data ?? []).slice(0, 5));
+        setPayments(paymentsRes.data.data ?? []);
         setChartData((chartRes.data ?? []).slice(-6));
-        const sorted = (logsRes.data ?? []).sort(
-          (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        const sorted = (logsRes.data.data ?? []).sort(
+          (a: ActivityLog, b: ActivityLog) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         );
         setLogs(sorted.slice(0, 8));
       } catch {
