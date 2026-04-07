@@ -30,7 +30,7 @@ interface MenuItem {
 
 export default function ProfileScreen() {
   const router = useRouter();
-  const { user, logout } = useAuth();
+  const { user, logout, refreshUser } = useAuth();
 
   // Edit Profile state
   const [editVisible, setEditVisible] = useState(false);
@@ -64,6 +64,7 @@ export default function ProfileScreen() {
         email: editEmail.trim() || undefined,
         address: editAddress.trim() || undefined,
       });
+      await refreshUser();
       Alert.alert('Success', 'Profile updated successfully');
       setEditVisible(false);
     } catch (err: any) {

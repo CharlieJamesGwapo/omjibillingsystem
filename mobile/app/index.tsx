@@ -17,10 +17,10 @@ export default function Index() {
     return <Redirect href="/(customer)/home" />;
   }
 
-  if (user.role === 'technician') {
+  if (user.role === 'technician' || user.role === 'admin') {
     return <Redirect href="/(technician)/home" />;
   }
 
-  // Fallback for admin or unknown roles
+  // Fallback for unknown roles
   return <Redirect href="/(auth)/login" />;
 }

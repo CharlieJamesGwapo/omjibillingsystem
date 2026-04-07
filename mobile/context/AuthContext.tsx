@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
 import { User } from '../types';
 import { login as loginApi } from '../services/auth';
+import { getUser as getUserApi } from '../services/users';
 import {
   saveTokens,
   saveUser as saveUserToStorage,
@@ -15,6 +16,7 @@ interface AuthState {
   isAuthenticated: boolean;
   login: (phone: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthState | undefined>(undefined);
@@ -55,6 +57,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
   }, []);
 
+  const refreshUser = useCallback(async () => {
+    if (!user) return;
+    try {
+      const updated = await getUserApi(user.id);
+      await saveUserToStorage(updated);
+      setUser(updated);
+    } catch {
+      // If fetch fails, keep existing user data
+    }
+  }, [user]);
+
   const value = useMemo<AuthState>(
     () => ({
       user,
@@ -62,8 +75,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       isAuthenticated: !!user,
       login,
       logout,
+      refreshUser,
     }),
-    [user, isLoading, login, logout],
+    [user, isLoading, login, logout, refreshUser],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

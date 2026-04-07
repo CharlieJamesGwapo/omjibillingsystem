@@ -73,8 +73,8 @@ func New(deps Deps, corsOrigins string) http.Handler {
 	mux.Handle("GET /api/subscriptions/{id}", chain(deps.SubHandler.GetByID, authMW, anyRole))
 	mux.Handle("POST /api/subscriptions", chain(deps.SubHandler.Create, authMW, adminOnly))
 	mux.Handle("PUT /api/subscriptions/{id}", chain(deps.SubHandler.Update, authMW, adminOnly))
-	mux.Handle("POST /api/subscriptions/{id}/disconnect", chain(deps.SubHandler.Disconnect, authMW, adminOnly))
-	mux.Handle("POST /api/subscriptions/{id}/reconnect", chain(deps.SubHandler.Reconnect, authMW, adminOnly))
+	mux.Handle("POST /api/subscriptions/{id}/disconnect", chain(deps.SubHandler.Disconnect, authMW, adminOrTech))
+	mux.Handle("POST /api/subscriptions/{id}/reconnect", chain(deps.SubHandler.Reconnect, authMW, adminOrTech))
 
 	// --- Payments ---
 	mux.Handle("GET /api/payments", chain(deps.PayHandler.List, authMW, adminOrTech))
