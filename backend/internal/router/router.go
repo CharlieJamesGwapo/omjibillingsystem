@@ -28,11 +28,13 @@ type Deps struct {
 func New(deps Deps, corsOrigins string) http.Handler {
 	mux := http.NewServeMux()
 
-	// Health check
-	mux.HandleFunc("GET /api/health", func(w http.ResponseWriter, r *http.Request) {
+	// Health check (both paths for Render compatibility)
+	healthHandler := func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte(`{"status":"ok"}`))
-	})
+	}
+	mux.HandleFunc("GET /api/health", healthHandler)
+	mux.HandleFunc("GET /health", healthHandler)
 
 	// Public auth routes
 	mux.HandleFunc("POST /api/auth/otp/request", deps.AuthHandler.RequestOTP)
