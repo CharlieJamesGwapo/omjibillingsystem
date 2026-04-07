@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"golang.org/x/crypto/bcrypt"
 )
 
 func Connect(databaseURL string) (*pgxpool.Pool, error) {
@@ -114,4 +115,67 @@ func RunMigrations(pool *pgxpool.Pool, migrationsDir string) error {
 	}
 
 	return nil
+}
+
+// SeedDefaults inserts default admin, technician, and plans if they don't exist.
+func SeedDefaults(pool *pgxpool.Pool) {
+	ctx := context.Background()
+
+	type seedUser struct {
+		phone, name, password, role string
+	}
+	users := []seedUser{
+		{"09170000001", "OMJI Admin", "admin123", "admin"},
+		{"09170000002", "Mark Rivera (Technician)", "tech123", "technician"},
+	}
+
+	for _, u := range users {
+		var exists bool
+		pool.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM users WHERE phone = $1)", u.phone).Scan(&exists)
+		if exists {
+			continue
+		}
+		hash, err := bcrypt.GenerateFromPassword([]byte(u.password), bcrypt.DefaultCost)
+		if err != nil {
+			log.Printf("[SEED] Failed to hash password for %s: %v", u.name, err)
+			continue
+		}
+		_, err = pool.Exec(ctx, `
+			INSERT INTO users (id, phone, full_name, role, password_hash, status, created_at, updated_at)
+			VALUES (gen_random_uuid(), $1, $2, $3, $4, 'active', NOW(), NOW())
+		`, u.phone, u.name, u.role, string(hash))
+		if err != nil {
+			log.Printf("[SEED] Failed to create user %s: %v", u.name, err)
+		} else {
+			log.Printf("[SEED] Created user: %s (%s)", u.name, u.phone)
+		}
+	}
+
+	type seedPlan struct {
+		name  string
+		speed int
+		price float64
+	}
+	plans := []seedPlan{
+		{"Basic 10Mbps", 10, 500},
+		{"Standard 20Mbps", 20, 800},
+		{"Premium 50Mbps", 50, 1500},
+	}
+
+	for _, p := range plans {
+		var exists bool
+		pool.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM plans WHERE name = $1)", p.name).Scan(&exists)
+		if exists {
+			continue
+		}
+		_, err := pool.Exec(ctx, `
+			INSERT INTO plans (id, name, speed_mbps, price, is_active, created_at)
+			VALUES (gen_random_uuid(), $1, $2, $3, true, NOW())
+		`, p.name, p.speed, p.price)
+		if err != nil {
+			log.Printf("[SEED] Failed to create plan %s: %v", p.name, err)
+		} else {
+			log.Printf("[SEED] Created plan: %s (%dMbps @ ₱%.0f)", p.name, p.speed, p.price)
+		}
+	}
 }

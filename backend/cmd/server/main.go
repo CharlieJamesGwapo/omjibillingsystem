@@ -37,6 +37,9 @@ func main() {
 		log.Fatalf("Failed to run migrations: %v", err)
 	}
 
+	// Seed default users and plans if not present
+	database.SeedDefaults(pool)
+
 	// ---- Repositories ----
 	userRepo := repository.NewUserRepo(pool)
 	otpRepo := repository.NewOTPRepo(pool)
