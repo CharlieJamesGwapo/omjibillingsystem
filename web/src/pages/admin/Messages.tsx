@@ -4,7 +4,7 @@ import api from '../../lib/api';
 /* ─── Types ─── */
 interface Customer {
   id: string;
-  name: string;
+  full_name: string;
   phone: string;
   status?: string;
 }
@@ -299,8 +299,8 @@ export default function Messages() {
   /* ─── Data Loading ─── */
   const fetchCustomers = useCallback(async () => {
     try {
-      const res = await api.get<Customer[]>('/users', { params: { role: 'customer' } });
-      setCustomers(res.data ?? []);
+      const res = await api.get<{ data: Customer[] | null }>('/users?role=customer&limit=100');
+      setCustomers(res.data.data ?? []);
     } catch {
       /* silently fail */
     }
@@ -318,8 +318,8 @@ export default function Messages() {
   const fetchHistory = useCallback(async (page: number, append = false) => {
     setHistoryLoading(true);
     try {
-      const res = await api.get<MessageRecord[]>('/messages', { params: { page, limit: 20 } });
-      const data = res.data ?? [];
+      const res = await api.get<{ data: MessageRecord[] | null }>(`/messages?page=${page}&limit=20`);
+      const data = res.data.data ?? [];
       setMessages((prev) => (append ? [...prev, ...data] : data));
       setHasMoreHistory(data.length >= 20);
     } catch {
@@ -357,7 +357,7 @@ export default function Messages() {
     }
     const q = searchQuery.toLowerCase();
     const results = customers.filter(
-      (c) => c.name.toLowerCase().includes(q) || c.phone.includes(q)
+      (c) => c.full_name.toLowerCase().includes(q) || c.phone.includes(q)
     ).slice(0, 8);
     setSearchResults(results);
     setShowDropdown(results.length > 0);
@@ -383,7 +383,7 @@ export default function Messages() {
         recipient_id: selectedRecipient.id,
         message: message.trim(),
       });
-      setSendAlert({ type: 'success', message: `Message sent to ${selectedRecipient.name}` });
+      setSendAlert({ type: 'success', message: `Message sent to ${selectedRecipient.full_name}` });
       setMessage('');
       setSelectedRecipient(null);
     } catch {
@@ -595,7 +595,7 @@ export default function Messages() {
                         className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm"
                         style={{ background: 'rgba(34,211,238,0.1)', color: '#22d3ee' }}
                       >
-                        <span className="font-semibold">{selectedRecipient.name}</span>
+                        <span className="font-semibold">{selectedRecipient.full_name}</span>
                         <span className="text-[#64748b]">{selectedRecipient.phone}</span>
                         <button
                           onClick={() => { setSelectedRecipient(null); setSearchQuery(''); }}
@@ -633,10 +633,10 @@ export default function Messages() {
                                 className="w-8 h-8 rounded-full flex items-center justify-center shrink-0"
                                 style={{ background: 'rgba(34,211,238,0.1)', color: '#22d3ee', fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 700 }}
                               >
-                                {c.name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)}
+                                {c.full_name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)}
                               </div>
                               <div>
-                                <p className="text-sm font-semibold text-[#f1f5f9]">{c.name}</p>
+                                <p className="text-sm font-semibold text-[#f1f5f9]">{c.full_name}</p>
                                 <p className="text-xs text-[#64748b]">{c.phone}</p>
                               </div>
                             </button>
@@ -868,7 +868,7 @@ export default function Messages() {
                           }}
                           className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-[rgba(34,211,238,0.06)] transition-colors text-left cursor-pointer"
                         >
-                          <p className="text-sm text-[#f1f5f9]">{c.name}</p>
+                          <p className="text-sm text-[#f1f5f9]">{c.full_name}</p>
                           <p className="text-xs text-[#64748b] ml-auto">{c.phone}</p>
                         </button>
                       ))}
