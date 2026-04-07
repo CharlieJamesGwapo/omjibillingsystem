@@ -41,6 +41,20 @@ func Connect(databaseURL string) (*pgxpool.Pool, error) {
 func RunMigrations(pool *pgxpool.Pool, migrationsDir string) error {
 	ctx := context.Background()
 
+	// Check if this is a fresh billing system database by looking for the settings table
+	var hasSettings bool
+	pool.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM information_schema.tables WHERE table_name = 'settings')").Scan(&hasSettings)
+
+	if !hasSettings {
+		// Drop all existing tables from old projects so billing migrations can run clean
+		log.Println("[MIGRATE] Clean database detected — dropping any legacy tables")
+		pool.Exec(ctx, `
+			DROP SCHEMA public CASCADE;
+			CREATE SCHEMA public;
+			GRANT ALL ON SCHEMA public TO current_user;
+		`)
+	}
+
 	_, err := pool.Exec(ctx, `
 		CREATE TABLE IF NOT EXISTS schema_migrations (
 			version INTEGER PRIMARY KEY,
