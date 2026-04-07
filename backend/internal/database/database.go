@@ -49,18 +49,31 @@ func RunMigrations(pool *pgxpool.Pool, migrationsDir string) error {
 	if !hasSubscriptions {
 		// Drop everything and start fresh — old project tables or incomplete migrations
 		log.Println("[MIGRATE] Billing schema incomplete — dropping all tables for clean migration")
-		pool.Exec(ctx, `
-			DROP SCHEMA public CASCADE;
-			CREATE SCHEMA public;
-			GRANT ALL ON SCHEMA public TO current_user;
+
+		// Get all user tables and drop them individually (safer than DROP SCHEMA on managed DBs)
+		rows, _ := pool.Query(ctx, `
+			SELECT tablename FROM pg_tables WHERE schemaname = 'public'
 		`)
-		// Recreate the migrations tracking table
-		pool.Exec(ctx, `
-			CREATE TABLE IF NOT EXISTS schema_migrations (
-				version INTEGER PRIMARY KEY,
-				applied_at TIMESTAMPTZ DEFAULT NOW()
-			)
-		`)
+		if rows != nil {
+			var tables []string
+			for rows.Next() {
+				var t string
+				rows.Scan(&t)
+				tables = append(tables, t)
+			}
+			rows.Close()
+			for _, t := range tables {
+				pool.Exec(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %q CASCADE", t))
+				log.Printf("[MIGRATE] Dropped table: %s", t)
+			}
+		}
+
+		// Also drop custom types
+		pool.Exec(ctx, "DROP TYPE IF EXISTS user_role CASCADE")
+		pool.Exec(ctx, "DROP TYPE IF EXISTS user_status CASCADE")
+		pool.Exec(ctx, "DROP TYPE IF EXISTS subscription_status CASCADE")
+		pool.Exec(ctx, "DROP TYPE IF EXISTS payment_method CASCADE")
+		pool.Exec(ctx, "DROP TYPE IF EXISTS payment_status CASCADE")
 	}
 
 	_, err := pool.Exec(ctx, `
@@ -102,11 +115,9 @@ func RunMigrations(pool *pgxpool.Pool, migrationsDir string) error {
 
 		_, execErr := pool.Exec(ctx, string(sql))
 		if execErr != nil {
-			// If migration fails because objects already exist, mark it as applied and continue
-			log.Printf("Migration %s had conflicts (likely already applied): %v — marking as applied", entry.Name(), execErr)
-		} else {
-			log.Printf("Applied migration: %s", entry.Name())
+			return fmt.Errorf("execute migration %s: %w", entry.Name(), execErr)
 		}
+		log.Printf("Applied migration: %s", entry.Name())
 
 		_, err = pool.Exec(ctx, "INSERT INTO schema_migrations (version) VALUES ($1)", version)
 		if err != nil {
