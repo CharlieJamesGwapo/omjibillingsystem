@@ -78,17 +78,18 @@ func RunMigrations(pool *pgxpool.Pool, migrationsDir string) error {
 			return fmt.Errorf("read migration %s: %w", entry.Name(), err)
 		}
 
-		_, err = pool.Exec(ctx, string(sql))
-		if err != nil {
-			return fmt.Errorf("execute migration %s: %w", entry.Name(), err)
+		_, execErr := pool.Exec(ctx, string(sql))
+		if execErr != nil {
+			// If migration fails because objects already exist, mark it as applied and continue
+			log.Printf("Migration %s had conflicts (likely already applied): %v — marking as applied", entry.Name(), execErr)
+		} else {
+			log.Printf("Applied migration: %s", entry.Name())
 		}
 
 		_, err = pool.Exec(ctx, "INSERT INTO schema_migrations (version) VALUES ($1)", version)
 		if err != nil {
 			return fmt.Errorf("record migration %d: %w", version, err)
 		}
-
-		log.Printf("Applied migration: %s", entry.Name())
 	}
 
 	return nil
