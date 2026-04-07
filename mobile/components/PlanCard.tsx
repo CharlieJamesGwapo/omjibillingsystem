@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-// LinearGradient removed to avoid Android crash
+import { LinearGradient } from 'expo-linear-gradient';
 import { Colors } from '@/constants/colors';
 import Badge from '@/components/ui/Badge';
 import { formatDate } from '@/utils/format';
@@ -21,7 +21,12 @@ interface PlanCardProps {
 
 export default function PlanCard({ plan, subscription, style }: PlanCardProps) {
   return (
-    <View style={[styles.gradient, { backgroundColor: Colors.primary }, style]}>
+    <LinearGradient
+      colors={[Colors.primary, Colors.primaryDark]}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={[styles.gradient, style]}
+    >
       <View style={styles.topRow}>
         <Text style={styles.planName}>{plan.name}</Text>
         <View style={styles.badgeWrapper}>
@@ -39,7 +44,7 @@ export default function PlanCard({ plan, subscription, style }: PlanCardProps) {
           Next due: {formatDate(subscription.next_due_date)}
         </Text>
       </View>
-    </View>
+    </LinearGradient>
   );
 }
 

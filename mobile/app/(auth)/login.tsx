@@ -9,7 +9,7 @@ import {
   Platform,
   Dimensions,
 } from 'react-native';
-// Using plain View instead of LinearGradient to avoid Android crash
+import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
@@ -104,7 +104,12 @@ export default function LoginScreen() {
           showsVerticalScrollIndicator={false}
         >
           {/* Gradient Header */}
-          <View style={[styles.gradient, { backgroundColor: Colors.primary }]}>
+          <LinearGradient
+            colors={[Colors.primary, Colors.primaryDark]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.gradient}
+          >
             <View style={styles.logoContainer}>
               <Image source={logo} style={styles.logo} />
             </View>
@@ -112,7 +117,7 @@ export default function LoginScreen() {
             <Text style={styles.brandSubtitle}>
               Pasugo &bull; Pasabay &bull; Pasundo
             </Text>
-          </View>
+          </LinearGradient>
 
           {/* Form Card */}
           <View style={styles.card}>
@@ -147,7 +152,7 @@ export default function LoginScreen() {
                   if (passwordError) setPasswordError('');
                   if (generalError) setGeneralError('');
                 }}
-                secureTextEntry
+                secureTextEntry={true}
                 autoCapitalize="none"
                 error={passwordError}
               />
