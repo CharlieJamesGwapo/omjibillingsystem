@@ -7,7 +7,6 @@ import {
   SafeAreaView,
   RefreshControl,
   TouchableOpacity,
-  Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -68,10 +67,10 @@ export default function TechnicianHomeScreen() {
       onPress: () => router.push('/(technician)/clients'),
     },
     {
-      icon: 'wifi-outline' as const,
-      label: 'Network',
-      onPress: () =>
-        Alert.alert('Coming Soon', 'Network monitoring will be available in a future update.'),
+      icon: 'alert-circle-outline' as const,
+      label: 'Overdue',
+      onPress: () => router.push('/(technician)/clients'),
+      badge: stats?.overdue ?? 0,
     },
     {
       icon: 'search-outline' as const,
