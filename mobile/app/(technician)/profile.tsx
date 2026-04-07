@@ -11,7 +11,7 @@ import {
   Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { LinearGradient } from 'expo-linear-gradient';
+// Using plain View instead of LinearGradient to avoid Android crash
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '@/constants/colors';
 import { useAuth } from '@/context/AuthContext';
@@ -178,19 +178,14 @@ export default function TechnicianProfileScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* Profile Header */}
-        <LinearGradient
-          colors={[Colors.primary, Colors.primaryDark]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.headerGradient}
-        >
+        <View style={[styles.headerGradient, { backgroundColor: Colors.primary }]}>
           <Avatar name={user?.full_name ?? 'User'} size={64} style={styles.avatar} />
           <Text style={styles.fullName}>{user?.full_name ?? 'User'}</Text>
           <View style={styles.roleBadge}>
             <Text style={styles.roleText}>Technician</Text>
           </View>
           <Text style={styles.phone}>{user?.phone ?? ''}</Text>
-        </LinearGradient>
+        </View>
 
         {/* Account Section */}
         <View style={styles.sectionContainer}>
