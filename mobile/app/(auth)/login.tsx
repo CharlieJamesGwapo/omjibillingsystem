@@ -115,7 +115,7 @@ export default function LoginScreen() {
             </View>
             <Text style={styles.brandTitle}>OMJI Billing</Text>
             <Text style={styles.brandSubtitle}>
-              Pasugo &bull; Pasabay &bull; Pasundo
+              Internet Access &amp; Billing System
             </Text>
           </LinearGradient>
 
