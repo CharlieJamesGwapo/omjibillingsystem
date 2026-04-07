@@ -40,16 +40,15 @@ export default function TechnicianLayout() {
         tabBarInactiveTintColor: Colors.grey500,
         tabBarStyle: {
           backgroundColor: '#FFFFFF',
-          height: Platform.OS === 'ios' ? 88 : 60,
-          paddingBottom: Platform.OS === 'ios' ? 28 : 8,
+          height: Platform.OS === 'ios' ? 88 : 64,
+          paddingBottom: Platform.OS === 'ios' ? 28 : 10,
           paddingTop: 8,
-          borderTopWidth: 0.5,
-          borderTopColor: Colors.border,
+          borderTopWidth: 0,
           shadowColor: '#000000',
-          shadowOffset: { width: 0, height: -2 },
-          shadowOpacity: 0.05,
-          shadowRadius: 4,
-          elevation: 8,
+          shadowOffset: { width: 0, height: -4 },
+          shadowOpacity: 0.08,
+          shadowRadius: 12,
+          elevation: 12,
         },
         tabBarLabelStyle: {
           fontSize: 11,
@@ -64,7 +63,7 @@ export default function TechnicianLayout() {
           tabBarIcon: ({ color, focused }) => (
             <Ionicons
               name={focused ? 'home' : 'home-outline'}
-              size={24}
+              size={22}
               color={color}
             />
           ),
@@ -78,7 +77,7 @@ export default function TechnicianLayout() {
             <View>
               <Ionicons
                 name={focused ? 'card' : 'card-outline'}
-                size={24}
+                size={22}
                 color={color}
               />
               <TabBarBadge count={pendingCount} />
@@ -93,7 +92,7 @@ export default function TechnicianLayout() {
           tabBarIcon: ({ color, focused }) => (
             <Ionicons
               name={focused ? 'people' : 'people-outline'}
-              size={24}
+              size={22}
               color={color}
             />
           ),
@@ -106,7 +105,7 @@ export default function TechnicianLayout() {
           tabBarIcon: ({ color, focused }) => (
             <Ionicons
               name={focused ? 'person' : 'person-outline'}
-              size={24}
+              size={22}
               color={color}
             />
           ),

@@ -3,6 +3,7 @@ import { Tabs, Redirect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Platform } from 'react-native';
 import { useAuth } from '@/context/AuthContext';
+import { Colors } from '@/constants/colors';
 
 export default function CustomerLayout() {
   const { isAuthenticated, user } = useAuth();
@@ -16,20 +17,19 @@ export default function CustomerLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: '#0e7490',
-        tabBarInactiveTintColor: '#888888',
+        tabBarActiveTintColor: Colors.primary,
+        tabBarInactiveTintColor: Colors.grey500,
         tabBarStyle: {
           backgroundColor: '#FFFFFF',
-          height: Platform.OS === 'ios' ? 88 : 60,
-          paddingBottom: Platform.OS === 'ios' ? 28 : 8,
+          height: Platform.OS === 'ios' ? 88 : 64,
+          paddingBottom: Platform.OS === 'ios' ? 28 : 10,
           paddingTop: 8,
-          borderTopWidth: 0.5,
-          borderTopColor: '#E0E0E0',
+          borderTopWidth: 0,
           shadowColor: '#000000',
-          shadowOffset: { width: 0, height: -2 },
-          shadowOpacity: 0.05,
-          shadowRadius: 4,
-          elevation: 8,
+          shadowOffset: { width: 0, height: -4 },
+          shadowOpacity: 0.08,
+          shadowRadius: 12,
+          elevation: 12,
         },
         tabBarLabelStyle: {
           fontSize: 11,
@@ -44,7 +44,7 @@ export default function CustomerLayout() {
           tabBarIcon: ({ color, focused }) => (
             <Ionicons
               name={focused ? 'home' : 'home-outline'}
-              size={24}
+              size={22}
               color={color}
             />
           ),
@@ -57,7 +57,7 @@ export default function CustomerLayout() {
           tabBarIcon: ({ color, focused }) => (
             <Ionicons
               name={focused ? 'card' : 'card-outline'}
-              size={24}
+              size={22}
               color={color}
             />
           ),
@@ -70,7 +70,7 @@ export default function CustomerLayout() {
           tabBarIcon: ({ color, focused }) => (
             <Ionicons
               name={focused ? 'wifi' : 'wifi-outline'}
-              size={24}
+              size={22}
               color={color}
             />
           ),
@@ -83,7 +83,7 @@ export default function CustomerLayout() {
           tabBarIcon: ({ color, focused }) => (
             <Ionicons
               name={focused ? 'person' : 'person-outline'}
-              size={24}
+              size={22}
               color={color}
             />
           ),
