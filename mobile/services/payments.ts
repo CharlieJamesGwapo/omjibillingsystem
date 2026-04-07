@@ -7,8 +7,9 @@ export async function getMyPayments(): Promise<Payment[]> {
 }
 
 export async function getAllPayments(status?: string): Promise<Payment[]> {
-  const query = status ? `?status=${encodeURIComponent(status)}` : '';
-  return apiRequest<Payment[]>(`${ENDPOINTS.payments.list}${query}`);
+  const query = status ? `?status=${encodeURIComponent(status)}&limit=100` : '?limit=100';
+  const res = await apiRequest<{ data: Payment[] | null }>(`${ENDPOINTS.payments.list}${query}`);
+  return res.data ?? [];
 }
 
 export async function createPayment(formData: FormData): Promise<Payment> {
