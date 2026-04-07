@@ -10,14 +10,14 @@ function RootNavigator() {
   if (isLoading) {
     return (
       <View style={styles.splash}>
-        <ActivityIndicator size="large" color="#CC0000" />
+        <ActivityIndicator size="large" color="#0e7490" />
       </View>
     );
   }
 
   return (
     <>
-      <StatusBar style="light" backgroundColor="#CC0000" />
+      <StatusBar style="light" backgroundColor="#0a1120" />
       <Stack screenOptions={{ headerShown: false }} />
     </>
   );

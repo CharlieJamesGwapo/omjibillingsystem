@@ -29,7 +29,7 @@ export default function TechnicianLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: '#CC0000',
+        tabBarActiveTintColor: '#0e7490',
         tabBarInactiveTintColor: '#888888',
         tabBarStyle: {
           backgroundColor: '#FFFFFF',
@@ -114,7 +114,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: -4,
     right: -10,
-    backgroundColor: '#CC0000',
+    backgroundColor: '#0e7490',
     borderRadius: 9,
     minWidth: 18,
     height: 18,

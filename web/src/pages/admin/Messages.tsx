@@ -396,7 +396,7 @@ export default function Messages() {
   const handleSendGroup = async () => {
     setSending(true);
     try {
-      const res = await api.post<{ sent: number; failed: number }>('/messages/send-group', {
+      const res = await api.post<{ sent: number; failed: number }>('/messages/bulk', {
         filter: groupFilter,
         message: message.trim(),
       });
@@ -414,8 +414,8 @@ export default function Messages() {
   const handleSendTemplate = async () => {
     setSending(true);
     try {
-      const res = await api.post<{ sent: number; failed: number }>('/messages/send-template', {
-        template_id: selectedTemplateId,
+      const res = await api.post<{ sent: number; failed: number }>('/messages/template', {
+        template: selectedTemplateId,
         filter: groupFilter,
       });
       const d = res.data;
@@ -437,7 +437,16 @@ export default function Messages() {
       return next;
     });
     try {
-      const res = await api.post<{ sent: number; failed: number }>(`/messages/${action}`, payload);
+      let res;
+      if (action === 'send-reminders') {
+        res = await api.post<{ sent: number; failed: number }>('/messages/reminders', { days_before: 2 });
+      } else if (action === 'send-overdue') {
+        res = await api.post<{ sent: number; failed: number }>('/messages/template', { template: 'overdue_notice', filter: 'overdue' });
+      } else if (action === 'send-welcome' && payload?.customer_id) {
+        res = await api.post<{ sent: number; failed: number }>('/messages/send', { recipient_id: payload.customer_id, message: 'Welcome to OMJI Internet! Your account has been set up successfully.' });
+      } else {
+        res = await api.post<{ sent: number; failed: number }>(`/messages/${action}`, payload);
+      }
       const d = res.data;
       setQuickResult((prev) => ({
         ...prev,

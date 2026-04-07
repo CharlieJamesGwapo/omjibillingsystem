@@ -210,7 +210,7 @@ export default function AdminLayout() {
       {/* Logo area */}
       <div className="p-5 flex items-center gap-3">
         <img
-          src="/lego.jpeg"
+          src="/omji-logo.svg"
           alt="OMJI"
           className="w-9 h-9 rounded-full object-cover ring-1 ring-[rgba(34,211,238,0.1)]"
         />
@@ -303,7 +303,7 @@ export default function AdminLayout() {
             </svg>
           </button>
           <div className="flex items-center gap-2 ml-3">
-            <img src="/lego.jpeg" alt="OMJI" className="w-7 h-7 rounded-full object-cover" />
+            <img src="/omji-logo.svg" alt="OMJI" className="w-7 h-7 rounded-full object-cover" />
             <span className="font-heading text-[14px] font-bold text-text-primary tracking-wide">
               OMJI
             </span>

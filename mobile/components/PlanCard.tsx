@@ -22,7 +22,7 @@ interface PlanCardProps {
 export default function PlanCard({ plan, subscription, style }: PlanCardProps) {
   return (
     <LinearGradient
-      colors={['#CC0000', '#990000']}
+      colors={[Colors.primary, Colors.primaryDark]}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
       style={[styles.gradient, style]}
