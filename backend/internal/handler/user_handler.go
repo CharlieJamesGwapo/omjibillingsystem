@@ -98,6 +98,29 @@ func (h *UserHandler) Create(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, user)
 }
 
+// UpdateMe allows the authenticated user to update their own profile.
+// Only full_name, email, address, and password are allowed.
+func (h *UserHandler) UpdateMe(w http.ResponseWriter, r *http.Request) {
+	callerID := middleware.GetUserID(r.Context())
+
+	var req model.UpdateUserRequest
+	if err := decodeJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	// Prevent self-role/status changes
+	req.Role = nil
+	req.Status = nil
+
+	user, err := h.userService.Update(r.Context(), callerID, &req)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to update profile")
+		return
+	}
+	writeJSON(w, http.StatusOK, user)
+}
+
 // Update updates an existing user.
 func (h *UserHandler) Update(w http.ResponseWriter, r *http.Request) {
 	idStr := r.PathValue("id")

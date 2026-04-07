@@ -56,6 +56,7 @@ func New(deps Deps, corsOrigins string) http.Handler {
 	// --- Users ---
 	mux.Handle("GET /api/users", chain(deps.UserHandler.List, authMW, adminOrTech))
 	mux.Handle("POST /api/users", chain(deps.UserHandler.Create, authMW, adminOnly))
+	mux.Handle("PUT /api/users/me", chain(deps.UserHandler.UpdateMe, authMW, anyRole))
 	mux.Handle("GET /api/users/{id}", chain(deps.UserHandler.GetByID, authMW, anyRole))
 	mux.Handle("PUT /api/users/{id}", chain(deps.UserHandler.Update, authMW, adminOrTech))
 	mux.Handle("DELETE /api/users/{id}", chain(deps.UserHandler.Delete, authMW, adminOnly))
@@ -83,7 +84,7 @@ func New(deps Deps, corsOrigins string) http.Handler {
 	mux.Handle("POST /api/payments/{id}/reject", chain(deps.PayHandler.Reject, authMW, adminOrTech))
 
 	// --- Dashboard ---
-	mux.Handle("GET /api/dashboard/stats", chain(deps.DashHandler.GetStats, authMW, adminOnly))
+	mux.Handle("GET /api/dashboard/stats", chain(deps.DashHandler.GetStats, authMW, adminOrTech))
 	mux.Handle("GET /api/dashboard/income", chain(deps.DashHandler.GetIncomeReport, authMW, adminOnly))
 	mux.Handle("GET /api/dashboard/chart", chain(deps.DashHandler.GetIncomeChart, authMW, adminOrTech))
 	mux.Handle("GET /api/dashboard/logs", chain(deps.DashHandler.GetActivityLogs, authMW, adminOnly))
