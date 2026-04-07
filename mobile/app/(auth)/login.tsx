@@ -84,7 +84,7 @@ export default function LoginScreen() {
     if (user) {
       if (user.role === 'customer') {
         router.replace('/(customer)/home');
-      } else if (user.role === 'technician') {
+      } else if (user.role === 'technician' || user.role === 'admin') {
         router.replace('/(technician)/home');
       }
     }

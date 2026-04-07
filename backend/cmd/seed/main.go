@@ -45,7 +45,7 @@ func main() {
 	seedUsers := []seedUser{
 		{
 			phone:    "09170000001",
-			name:     "JDNS Admin",
+			name:     "OMJI Admin",
 			password: "admin123",
 			role:     model.RoleAdmin,
 		},

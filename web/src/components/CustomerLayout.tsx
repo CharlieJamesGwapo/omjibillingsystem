@@ -24,7 +24,7 @@ export default function CustomerLayout() {
             {/* Branding */}
             <div className="flex items-center gap-3 shrink-0">
               <img
-                src="/omji-logo.svg"
+                src="/lego.jpeg"
                 alt="OMJI"
                 className="w-9 h-9 rounded-full object-cover ring-1 ring-[rgba(34,211,238,0.1)]"
               />

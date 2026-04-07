@@ -1,11 +1,12 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { View, Text, StyleSheet, Platform } from 'react-native';
 import { Tabs, Redirect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/context/AuthContext';
-
-// Static badge count for pending payments — replace with context/state as needed
-const PENDING_PAYMENT_COUNT = 3;
+import { useApi } from '@/hooks/useApi';
+import { getDashboardStats } from '@/services/dashboard';
+import { DashboardStats } from '@/types';
+import { Colors } from '@/constants/colors';
 
 function TabBarBadge({ count }: { count: number }) {
   if (count <= 0) return null;
@@ -20,8 +21,14 @@ function TabBarBadge({ count }: { count: number }) {
 export default function TechnicianLayout() {
   const { isAuthenticated, user } = useAuth();
 
-  // Auth guard: redirect if not authenticated or not a technician
-  if (!isAuthenticated || !user || user.role !== 'technician') {
+  const {
+    data: stats,
+  } = useApi<DashboardStats>(useCallback(() => getDashboardStats(), []));
+
+  const pendingCount = stats?.pending_payments ?? 0;
+
+  // Auth guard: redirect if not authenticated or not a technician/admin
+  if (!isAuthenticated || !user || (user.role !== 'technician' && user.role !== 'admin')) {
     return <Redirect href="/(auth)/login" />;
   }
 
@@ -29,15 +36,15 @@ export default function TechnicianLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: '#0e7490',
-        tabBarInactiveTintColor: '#888888',
+        tabBarActiveTintColor: Colors.primary,
+        tabBarInactiveTintColor: Colors.grey500,
         tabBarStyle: {
           backgroundColor: '#FFFFFF',
           height: Platform.OS === 'ios' ? 88 : 60,
           paddingBottom: Platform.OS === 'ios' ? 28 : 8,
           paddingTop: 8,
           borderTopWidth: 0.5,
-          borderTopColor: '#E0E0E0',
+          borderTopColor: Colors.border,
           shadowColor: '#000000',
           shadowOffset: { width: 0, height: -2 },
           shadowOpacity: 0.05,
@@ -74,7 +81,7 @@ export default function TechnicianLayout() {
                 size={24}
                 color={color}
               />
-              <TabBarBadge count={PENDING_PAYMENT_COUNT} />
+              <TabBarBadge count={pendingCount} />
             </View>
           ),
         }}
@@ -114,7 +121,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: -4,
     right: -10,
-    backgroundColor: '#0e7490',
+    backgroundColor: Colors.error,
     borderRadius: 9,
     minWidth: 18,
     height: 18,

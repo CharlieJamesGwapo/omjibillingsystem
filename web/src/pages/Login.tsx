@@ -188,7 +188,7 @@ export default function Login() {
                   border: '2px solid rgba(34,211,238,0.25)',
                   boxShadow: '0 0 40px rgba(34,211,238,0.12), 0 0 80px rgba(34,211,238,0.05), inset 0 0 30px rgba(0,0,0,0.3)',
                 }}>
-                  <img src="/omji-logo.svg" alt="OMJI" className="w-full h-full object-cover" />
+                  <img src="/lego.jpeg" alt="OMJI" className="w-full h-full object-cover" />
                 </div>
 
                 {/* Status dot */}
@@ -249,7 +249,7 @@ export default function Login() {
                   border: '2px solid rgba(34,211,238,0.2)',
                   boxShadow: '0 0 30px rgba(34,211,238,0.1)',
                 }}>
-                  <img src="/omji-logo.svg" alt="OMJI" className="w-full h-full object-cover" />
+                  <img src="/lego.jpeg" alt="OMJI" className="w-full h-full object-cover" />
                 </div>
               </div>
               <h1 className="text-3xl font-bold tracking-wider" style={{ fontFamily: "'Rajdhani', sans-serif", color: '#ffffff' }}>OMJI</h1>
