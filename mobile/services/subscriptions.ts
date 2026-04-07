@@ -7,7 +7,8 @@ export async function getMySubscriptions(): Promise<Subscription[]> {
 }
 
 export async function getAllSubscriptions(): Promise<Subscription[]> {
-  return apiRequest<Subscription[]>(ENDPOINTS.subscriptions.list);
+  const res = await apiRequest<{ data: Subscription[] | null }>(`${ENDPOINTS.subscriptions.list}?limit=100`);
+  return res.data ?? [];
 }
 
 export async function getSubscription(id: string): Promise<Subscription> {
