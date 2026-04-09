@@ -23,6 +23,13 @@ export async function updateMyProfile(data: {
   });
 }
 
+export async function updateMyLocation(latitude: number, longitude: number): Promise<User> {
+  return apiRequest<User>('/api/users/me', {
+    method: 'PUT',
+    body: { latitude, longitude },
+  });
+}
+
 export async function changeMyPassword(password: string): Promise<User> {
   return apiRequest<User>('/api/users/me', {
     method: 'PUT',

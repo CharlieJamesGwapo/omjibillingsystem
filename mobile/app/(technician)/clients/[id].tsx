@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,8 @@ import {
   StyleSheet,
   Alert,
   ActivityIndicator,
+  Linking,
+  TouchableOpacity,
 } from 'react-native';
 import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -18,7 +20,8 @@ import {
   reconnectSubscription,
 } from '@/services/subscriptions';
 import { getAllPayments } from '@/services/payments';
-import { Subscription, Payment } from '@/types';
+import { getUser } from '@/services/users';
+import { Subscription, Payment, User } from '@/types';
 import { formatCurrency, formatDate } from '@/utils/format';
 import Card from '@/components/ui/Card';
 import Badge from '@/components/ui/Badge';
@@ -30,6 +33,7 @@ export default function ClientDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const [actionLoading, setActionLoading] = useState(false);
+  const [customerUser, setCustomerUser] = useState<User | null>(null);
 
   const fetchSubscription = useCallback(() => getSubscription(id!), [id]);
   const {
@@ -43,6 +47,23 @@ export default function ClientDetailScreen() {
     useApi<Payment[]>(fetchPayments);
 
   const loading = subLoading;
+
+  // Fetch full user once subscription loads (to get coordinates)
+  useEffect(() => {
+    if (subscription?.user_id) {
+      getUser(subscription.user_id)
+        .then(setCustomerUser)
+        .catch(() => {});
+    }
+  }, [subscription?.user_id]);
+
+  const handleNavigate = () => {
+    if (!customerUser?.latitude || !customerUser?.longitude) return;
+    const url = `https://maps.google.com/?q=${customerUser.latitude},${customerUser.longitude}`;
+    Linking.openURL(url).catch(() =>
+      Alert.alert('Error', 'Could not open Maps application.')
+    );
+  };
 
   // Filter payments for this customer
   const customerPayments = useMemo(() => {
@@ -254,6 +275,24 @@ export default function ClientDetailScreen() {
           )}
         </Card>
 
+        {/* Location */}
+        {customerUser?.latitude != null && customerUser?.longitude != null && (
+          <Card style={styles.card}>
+            <Text style={styles.cardTitle}>Location</Text>
+            <TouchableOpacity
+              style={styles.navigateBtn}
+              activeOpacity={0.7}
+              onPress={handleNavigate}
+            >
+              <Ionicons name="navigate-outline" size={20} color="#FFFFFF" />
+              <Text style={styles.navigateBtnText}>Navigate to Customer</Text>
+            </TouchableOpacity>
+            <Text style={styles.coordsText}>
+              {customerUser.latitude.toFixed(5)}, {customerUser.longitude.toFixed(5)}
+            </Text>
+          </Card>
+        )}
+
         {/* Actions */}
         <Card style={styles.card}>
           <Text style={styles.cardTitle}>Actions</Text>
@@ -459,5 +498,26 @@ const styles = StyleSheet.create({
   emptyPaymentsText: {
     fontSize: 14,
     color: Colors.grey500,
+  },
+  navigateBtn: {
+    backgroundColor: Colors.primary,
+    borderRadius: 12,
+    paddingVertical: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginBottom: 10,
+  },
+  navigateBtnText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  coordsText: {
+    fontSize: 12,
+    color: Colors.grey500,
+    textAlign: 'center',
+    fontFamily: 'monospace',
   },
 });

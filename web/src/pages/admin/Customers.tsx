@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import api from '../../lib/api';
 import { formatDate } from '../../lib/utils';
@@ -11,6 +11,8 @@ interface CustomerForm {
   email: string;
   address: string;
   status: 'active' | 'inactive';
+  latitude: string;
+  longitude: string;
 }
 
 const emptyForm: CustomerForm = {
@@ -20,6 +22,8 @@ const emptyForm: CustomerForm = {
   email: '',
   address: '',
   status: 'active',
+  latitude: '',
+  longitude: '',
 };
 
 const LIMIT = 20;
@@ -39,6 +43,8 @@ export default function Customers() {
   const [deleteTarget, setDeleteTarget] = useState<User | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [statusFilter, setStatusFilter] = useState<'all' | UserStatus>('all');
+  const [geoLoading, setGeoLoading] = useState(false);
+  const geoRef = useRef(false);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -86,9 +92,38 @@ export default function Customers() {
       email: user.email || '',
       address: user.address || '',
       status: user.status || 'active',
+      latitude: user.latitude != null ? String(user.latitude) : '',
+      longitude: user.longitude != null ? String(user.longitude) : '',
     });
     setEditingId(user.id);
     setModalOpen(true);
+  };
+
+  const handleGetLocation = () => {
+    if (!navigator.geolocation) {
+      toast.error('Geolocation is not supported by your browser');
+      return;
+    }
+    setGeoLoading(true);
+    geoRef.current = true;
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        if (!geoRef.current) return;
+        setForm(f => ({
+          ...f,
+          latitude: String(pos.coords.latitude.toFixed(7)),
+          longitude: String(pos.coords.longitude.toFixed(7)),
+        }));
+        setGeoLoading(false);
+        toast.success('Location captured');
+      },
+      (err) => {
+        if (!geoRef.current) return;
+        setGeoLoading(false);
+        toast.error('Could not get location: ' + err.message);
+      },
+      { enableHighAccuracy: true, timeout: 10000 },
+    );
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -96,7 +131,7 @@ export default function Customers() {
     setSubmitting(true);
     try {
       if (editingId) {
-        const body: Record<string, string> = {
+        const body: Record<string, unknown> = {
           full_name: form.full_name,
           phone: form.phone,
           status: form.status,
@@ -104,6 +139,10 @@ export default function Customers() {
         if (form.email) body.email = form.email;
         if (form.address) body.address = form.address;
         if (form.password) body.password = form.password;
+        if (form.latitude && form.longitude) {
+          body.latitude = parseFloat(form.latitude);
+          body.longitude = parseFloat(form.longitude);
+        }
         await api.put(`/users/${editingId}`, body);
       } else {
         await api.post('/users', {
@@ -237,6 +276,7 @@ export default function Customers() {
                 <th>Phone</th>
                 <th>Email</th>
                 <th>Address</th>
+                <th>Location</th>
                 <th>Status</th>
                 <th>Actions</th>
               </tr>
@@ -244,7 +284,7 @@ export default function Customers() {
             <tbody>
               {users.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="!text-center !py-16">
+                  <td colSpan={7} className="!text-center !py-16">
                     <div className="flex flex-col items-center gap-3">
                       <svg className="w-12 h-12 text-[#334155]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z" />
@@ -263,6 +303,25 @@ export default function Customers() {
                       {user.address
                         ? <span title={user.address}>{user.address.length > 20 ? user.address.slice(0, 20) + '…' : user.address}</span>
                         : <span className="text-[#334155]">--</span>}
+                    </td>
+                    <td>
+                      {user.latitude != null && user.longitude != null ? (
+                        <a
+                          href={`https://maps.google.com/?q=${user.latitude},${user.longitude}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title={`${user.latitude.toFixed(5)}, ${user.longitude.toFixed(5)}`}
+                          className="inline-flex items-center gap-1 text-[#22d3ee] hover:text-[#67e8f9] transition-colors text-xs"
+                        >
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z" />
+                          </svg>
+                          Maps
+                        </a>
+                      ) : (
+                        <span className="text-[#334155]">--</span>
+                      )}
                     </td>
                     <td>{statusBadge(user.status)}</td>
                     <td>
@@ -327,8 +386,22 @@ export default function Customers() {
               )}
               {user.address && (
                 <p className="text-xs text-[#64748b] mt-0.5" style={{ fontFamily: "'Outfit', sans-serif" }}>
-                  {user.address.length > 20 ? user.address.slice(0, 20) + '…' : user.address}
+                  {user.address.length > 30 ? user.address.slice(0, 30) + '…' : user.address}
                 </p>
+              )}
+              {user.latitude != null && user.longitude != null && (
+                <a
+                  href={`https://maps.google.com/?q=${user.latitude},${user.longitude}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-[#22d3ee] text-xs mt-1 hover:underline"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z" />
+                  </svg>
+                  View on Maps
+                </a>
               )}
             </div>
           ))
@@ -443,6 +516,62 @@ export default function Customers() {
                   className="form-input"
                 />
               </div>
+              {editingId && (
+                <div>
+                  <label className="form-label">
+                    GPS Coordinates
+                    <span className="ml-2 text-[#475569] text-xs font-normal">(for technician navigation)</span>
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="Latitude"
+                      value={form.latitude}
+                      onChange={(e) => setForm({ ...form, latitude: e.target.value })}
+                      className="form-input flex-1"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Longitude"
+                      value={form.longitude}
+                      onChange={(e) => setForm({ ...form, longitude: e.target.value })}
+                      className="form-input flex-1"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleGetLocation}
+                      disabled={geoLoading}
+                      title="Use my current location"
+                      className="w-10 h-10 flex-shrink-0 rounded-lg flex items-center justify-center border border-white/10 bg-white/5 hover:bg-white/10 text-[#22d3ee] disabled:opacity-40 transition-all"
+                    >
+                      {geoLoading ? (
+                        <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                        </svg>
+                      ) : (
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z" />
+                        </svg>
+                      )}
+                    </button>
+                  </div>
+                  {form.latitude && form.longitude && (
+                    <a
+                      href={`https://maps.google.com/?q=${form.latitude},${form.longitude}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-[#22d3ee] text-xs mt-1.5 hover:underline"
+                    >
+                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+                      </svg>
+                      Preview on Google Maps
+                    </a>
+                  )}
+                </div>
+              )}
               {editingId && (
                 <div>
                   <label className="form-label">Status</label>

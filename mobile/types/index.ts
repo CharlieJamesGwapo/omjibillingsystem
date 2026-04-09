@@ -14,6 +14,8 @@ export interface User {
   full_name: string;
   email?: string;
   address?: string;
+  latitude?: number | null;
+  longitude?: number | null;
   role: UserRole;
   status: UserStatus;
   created_at: string;

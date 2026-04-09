@@ -24,9 +24,9 @@ func (r *UserRepo) Create(ctx context.Context, req *model.CreateUserRequest, pas
 	err := r.db.QueryRow(ctx, `
 		INSERT INTO users (phone, full_name, email, address, role, password_hash, status)
 		VALUES ($1, $2, $3, $4, $5, $6, $7)
-		RETURNING id, phone, full_name, email, address, role, status, created_at, updated_at`,
+		RETURNING id, phone, full_name, email, address, latitude, longitude, role, status, created_at, updated_at`,
 		req.Phone, req.FullName, req.Email, req.Address, req.Role, passwordHash, req.Status,
-	).Scan(&u.ID, &u.Phone, &u.FullName, &u.Email, &u.Address, &u.Role, &u.Status, &u.CreatedAt, &u.UpdatedAt)
+	).Scan(&u.ID, &u.Phone, &u.FullName, &u.Email, &u.Address, &u.Latitude, &u.Longitude, &u.Role, &u.Status, &u.CreatedAt, &u.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("create user: %w", err)
 	}
@@ -36,9 +36,9 @@ func (r *UserRepo) Create(ctx context.Context, req *model.CreateUserRequest, pas
 func (r *UserRepo) GetByID(ctx context.Context, id uuid.UUID) (*model.User, error) {
 	u := &model.User{}
 	err := r.db.QueryRow(ctx, `
-		SELECT id, phone, full_name, email, address, role, password_hash, status, created_at, updated_at
+		SELECT id, phone, full_name, email, address, latitude, longitude, role, password_hash, status, created_at, updated_at
 		FROM users WHERE id = $1`, id,
-	).Scan(&u.ID, &u.Phone, &u.FullName, &u.Email, &u.Address, &u.Role, &u.PasswordHash, &u.Status, &u.CreatedAt, &u.UpdatedAt)
+	).Scan(&u.ID, &u.Phone, &u.FullName, &u.Email, &u.Address, &u.Latitude, &u.Longitude, &u.Role, &u.PasswordHash, &u.Status, &u.CreatedAt, &u.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get user by id: %w", err)
 	}
@@ -48,9 +48,9 @@ func (r *UserRepo) GetByID(ctx context.Context, id uuid.UUID) (*model.User, erro
 func (r *UserRepo) GetByPhone(ctx context.Context, phone string) (*model.User, error) {
 	u := &model.User{}
 	err := r.db.QueryRow(ctx, `
-		SELECT id, phone, full_name, email, address, role, password_hash, status, created_at, updated_at
+		SELECT id, phone, full_name, email, address, latitude, longitude, role, password_hash, status, created_at, updated_at
 		FROM users WHERE phone = $1`, phone,
-	).Scan(&u.ID, &u.Phone, &u.FullName, &u.Email, &u.Address, &u.Role, &u.PasswordHash, &u.Status, &u.CreatedAt, &u.UpdatedAt)
+	).Scan(&u.ID, &u.Phone, &u.FullName, &u.Email, &u.Address, &u.Latitude, &u.Longitude, &u.Role, &u.PasswordHash, &u.Status, &u.CreatedAt, &u.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get user by phone: %w", err)
 	}
@@ -58,7 +58,7 @@ func (r *UserRepo) GetByPhone(ctx context.Context, phone string) (*model.User, e
 }
 
 func (r *UserRepo) List(ctx context.Context, role *model.UserRole) ([]*model.User, error) {
-	query := `SELECT id, phone, full_name, email, address, role, status, created_at, updated_at FROM users`
+	query := `SELECT id, phone, full_name, email, address, latitude, longitude, role, status, created_at, updated_at FROM users`
 	args := []interface{}{}
 	if role != nil {
 		query += ` WHERE role = $1`
@@ -75,7 +75,7 @@ func (r *UserRepo) List(ctx context.Context, role *model.UserRole) ([]*model.Use
 	var users []*model.User
 	for rows.Next() {
 		u := &model.User{}
-		if err := rows.Scan(&u.ID, &u.Phone, &u.FullName, &u.Email, &u.Address, &u.Role, &u.Status, &u.CreatedAt, &u.UpdatedAt); err != nil {
+		if err := rows.Scan(&u.ID, &u.Phone, &u.FullName, &u.Email, &u.Address, &u.Latitude, &u.Longitude, &u.Role, &u.Status, &u.CreatedAt, &u.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scan user: %w", err)
 		}
 		users = append(users, u)
@@ -112,7 +112,7 @@ func (r *UserRepo) ListPaginated(ctx context.Context, role string, search string
 	}
 
 	// Fetch paginated
-	dataQuery := "SELECT id, phone, full_name, email, address, role, status, created_at, updated_at FROM users" + whereClause +
+	dataQuery := "SELECT id, phone, full_name, email, address, latitude, longitude, role, status, created_at, updated_at FROM users" + whereClause +
 		fmt.Sprintf(" ORDER BY created_at DESC LIMIT $%d OFFSET $%d", argIdx, argIdx+1)
 	dataArgs := append(args, limit, offset)
 
@@ -125,7 +125,7 @@ func (r *UserRepo) ListPaginated(ctx context.Context, role string, search string
 	var users []*model.User
 	for rows.Next() {
 		u := &model.User{}
-		if err := rows.Scan(&u.ID, &u.Phone, &u.FullName, &u.Email, &u.Address, &u.Role, &u.Status, &u.CreatedAt, &u.UpdatedAt); err != nil {
+		if err := rows.Scan(&u.ID, &u.Phone, &u.FullName, &u.Email, &u.Address, &u.Latitude, &u.Longitude, &u.Role, &u.Status, &u.CreatedAt, &u.UpdatedAt); err != nil {
 			return nil, 0, fmt.Errorf("scan user: %w", err)
 		}
 		users = append(users, u)
@@ -161,6 +161,16 @@ func (r *UserRepo) Update(ctx context.Context, id uuid.UUID, req *model.UpdateUs
 		args = append(args, *req.Role)
 		argIdx++
 	}
+	if req.Latitude != nil {
+		setClauses = append(setClauses, fmt.Sprintf("latitude = $%d", argIdx))
+		args = append(args, *req.Latitude)
+		argIdx++
+	}
+	if req.Longitude != nil {
+		setClauses = append(setClauses, fmt.Sprintf("longitude = $%d", argIdx))
+		args = append(args, *req.Longitude)
+		argIdx++
+	}
 	if req.Status != nil {
 		setClauses = append(setClauses, fmt.Sprintf("status = $%d", argIdx))
 		args = append(args, *req.Status)
@@ -182,12 +192,12 @@ func (r *UserRepo) Update(ctx context.Context, id uuid.UUID, req *model.UpdateUs
 
 	args = append(args, id)
 	query := fmt.Sprintf(`UPDATE users SET %s WHERE id = $%d
-		RETURNING id, phone, full_name, email, address, role, status, created_at, updated_at`,
+		RETURNING id, phone, full_name, email, address, latitude, longitude, role, status, created_at, updated_at`,
 		strings.Join(setClauses, ", "), argIdx)
 
 	u := &model.User{}
 	err := r.db.QueryRow(ctx, query, args...).Scan(
-		&u.ID, &u.Phone, &u.FullName, &u.Email, &u.Address, &u.Role, &u.Status, &u.CreatedAt, &u.UpdatedAt,
+		&u.ID, &u.Phone, &u.FullName, &u.Email, &u.Address, &u.Latitude, &u.Longitude, &u.Role, &u.Status, &u.CreatedAt, &u.UpdatedAt,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("update user: %w", err)

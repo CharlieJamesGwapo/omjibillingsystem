@@ -12,6 +12,8 @@ export interface User {
   full_name: string
   email?: string | null
   address?: string | null
+  latitude?: number | null
+  longitude?: number | null
   role: UserRole
   status: UserStatus
   created_at: string

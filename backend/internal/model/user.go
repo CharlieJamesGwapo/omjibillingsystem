@@ -24,6 +24,8 @@ type User struct {
 	FullName     string     `json:"full_name"`
 	Email        *string    `json:"email"`
 	Address      *string    `json:"address"`
+	Latitude     *float64   `json:"latitude"`
+	Longitude    *float64   `json:"longitude"`
 	Role         UserRole   `json:"role"`
 	PasswordHash *string    `json:"-"`
 	Status       UserStatus `json:"status"`
@@ -42,10 +44,12 @@ type CreateUserRequest struct {
 }
 
 type UpdateUserRequest struct {
-	FullName *string    `json:"full_name"`
-	Email    *string    `json:"email"`
-	Address  *string    `json:"address"`
-	Role     *UserRole  `json:"role"`
-	Password *string    `json:"password"`
-	Status   *UserStatus `json:"status"`
+	FullName  *string     `json:"full_name"`
+	Email     *string     `json:"email"`
+	Address   *string     `json:"address"`
+	Latitude  *float64    `json:"latitude"`
+	Longitude *float64    `json:"longitude"`
+	Role      *UserRole   `json:"role"`
+	Password  *string     `json:"password"`
+	Status    *UserStatus `json:"status"`
 }

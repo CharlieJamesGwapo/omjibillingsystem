@@ -15,7 +15,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '@/constants/colors';
 import { useAuth } from '@/context/AuthContext';
-import { updateMyProfile, changeMyPassword } from '@/services/users';
+import { updateMyProfile, changeMyPassword, updateMyLocation } from '@/services/users';
 import Avatar from '@/components/ui/Avatar';
 import Card from '@/components/ui/Card';
 import Input from '@/components/ui/Input';
@@ -44,6 +44,9 @@ export default function ProfileScreen() {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [passLoading, setPassLoading] = useState(false);
+
+  // Location state
+  const [locationLoading, setLocationLoading] = useState(false);
 
   const openEditProfile = () => {
     setEditName(user?.full_name ?? '');
@@ -95,6 +98,32 @@ export default function ProfileScreen() {
     } finally {
       setPassLoading(false);
     }
+  };
+
+  const handleUpdateLocation = () => {
+    if (!navigator.geolocation) {
+      Alert.alert('Error', 'Location services not available on this device.');
+      return;
+    }
+    setLocationLoading(true);
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        try {
+          await updateMyLocation(pos.coords.latitude, pos.coords.longitude);
+          await refreshUser();
+          Alert.alert('Success', 'Your location has been updated.');
+        } catch (err: any) {
+          Alert.alert('Error', err?.message || 'Failed to update location.');
+        } finally {
+          setLocationLoading(false);
+        }
+      },
+      (err) => {
+        setLocationLoading(false);
+        Alert.alert('Location Error', err.message || 'Could not get your location. Please enable location permissions.');
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 },
+    );
   };
 
   const handleAbout = () => {
@@ -200,6 +229,43 @@ export default function ProfileScreen() {
         <View style={styles.sectionContainer}>
           <Text style={styles.sectionTitle}>Account</Text>
           <Card style={styles.menuCard}>{renderMenuItems(accountItems)}</Card>
+        </View>
+
+        {/* Location Section */}
+        <View style={styles.sectionContainer}>
+          <Text style={styles.sectionTitle}>Location</Text>
+          <Card style={styles.locationCard}>
+            <View style={styles.locationRow}>
+              <View style={styles.locationIcon}>
+                <Ionicons name="location-outline" size={22} color={Colors.primary} />
+              </View>
+              <View style={styles.locationInfo}>
+                <Text style={styles.locationLabel}>My Location</Text>
+                {user?.latitude != null && user?.longitude != null ? (
+                  <Text style={styles.locationCoords}>
+                    {(user.latitude as number).toFixed(5)}, {(user.longitude as number).toFixed(5)}
+                  </Text>
+                ) : (
+                  <Text style={styles.locationEmpty}>Not set — tap to update</Text>
+                )}
+              </View>
+              <TouchableOpacity
+                style={[styles.locationBtn, locationLoading && styles.locationBtnLoading]}
+                onPress={handleUpdateLocation}
+                disabled={locationLoading}
+                activeOpacity={0.7}
+              >
+                {locationLoading ? (
+                  <Ionicons name="hourglass-outline" size={18} color="#FFFFFF" />
+                ) : (
+                  <Ionicons name="navigate" size={18} color="#FFFFFF" />
+                )}
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.locationHint}>
+              Share your location so our technicians can find you quickly when you need support.
+            </Text>
+          </Card>
         </View>
 
         {/* App Section */}
@@ -415,6 +481,58 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: Colors.grey500,
     marginTop: 32,
+  },
+  locationCard: {
+    padding: 16,
+  },
+  locationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  locationIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    backgroundColor: Colors.grey100,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  locationInfo: {
+    flex: 1,
+  },
+  locationLabel: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: Colors.black,
+    marginBottom: 2,
+  },
+  locationCoords: {
+    fontSize: 12,
+    color: Colors.grey500,
+    fontFamily: 'monospace',
+  },
+  locationEmpty: {
+    fontSize: 12,
+    color: Colors.grey300,
+    fontStyle: 'italic',
+  },
+  locationBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    backgroundColor: Colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  locationBtnLoading: {
+    opacity: 0.6,
+  },
+  locationHint: {
+    fontSize: 12,
+    color: Colors.grey500,
+    lineHeight: 18,
   },
   // Modal styles
   modalOverlay: {
