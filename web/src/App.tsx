@@ -1,4 +1,5 @@
 import React, { Suspense } from 'react';
+import { Toaster } from 'sonner';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import ProtectedRoute from './components/ProtectedRoute';
 import AdminLayout from './components/AdminLayout';
@@ -79,6 +80,7 @@ export default function App() {
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Suspense>
+      <Toaster position="top-right" theme="dark" richColors />
     </BrowserRouter>
   );
 }

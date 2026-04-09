@@ -98,6 +98,39 @@ export interface MikroTikStatus {
   queue_count?: number;
 }
 
+export interface ActivityLog {
+  id: string
+  user_id: string
+  action: string
+  target_type: string
+  target_id: string
+  details: Record<string, unknown>
+  ip_address: string
+  created_at: string
+  user_name?: string   // resolved by frontend
+}
+
+export interface Notification {
+  id: string
+  type: 'payment_pending' | 'payment_approved' | 'payment_rejected' | 'subscription_overdue' | 'info'
+  title: string
+  message: string
+  read: boolean
+  created_at: string
+  link?: string
+}
+
+export interface MonthlyIncome {
+  month: string   // "2026-01"
+  amount: number
+}
+
+export interface ChartDataPoint {
+  month: string
+  amount: number
+  label?: string
+}
+
 export interface TokenPair {
   access_token: string
   refresh_token: string
