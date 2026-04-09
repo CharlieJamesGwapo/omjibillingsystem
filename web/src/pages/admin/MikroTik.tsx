@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { toast } from 'sonner';
 import api from '../../lib/api';
 import type { MikroTikStatus, PPPoESecret } from '../../lib/types';
 
@@ -21,10 +22,10 @@ export default function MikroTik() {
 
   const loadPPPoESecrets = async () => {
     try {
-      const res = await api.get('/api/mikrotik/pppoe/secrets');
+      const res = await api.get('/mikrotik/pppoe/secrets');
       setPppoeSecrets(res.data);
     } catch {
-      // silently fail if not connected
+      toast.error('Failed to load PPPoE secrets');
     }
   };
 
@@ -253,44 +254,49 @@ export default function MikroTik() {
 
       {/* PPPoE Secrets Section */}
       {status?.connected && (
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-gray-900">PPPoE Secrets</h2>
+        <div className="glass-card overflow-hidden animate-in animate-in-4">
+          <div className="px-5 py-4 border-b border-white/5 flex items-center justify-between">
+            <div>
+              <h2 className="font-heading text-lg font-bold text-text-primary">PPPoE Secrets</h2>
+              <p className="page-subtitle !mt-1">{pppoeSecrets.length} secret{pppoeSecrets.length !== 1 ? 's' : ''}</p>
+            </div>
             <button
               onClick={loadPPPoESecrets}
-              className="text-sm text-blue-600 hover:text-blue-700"
+              className="btn-outline !py-1.5 !px-3 !text-xs"
             >
               Refresh
             </button>
           </div>
           {pppoeSecrets.length === 0 ? (
-            <p className="text-sm text-gray-500">No PPPoE secrets found or not loaded yet.</p>
+            <div className="px-5 py-10 text-center">
+              <p className="text-text-secondary text-sm">No PPPoE secrets found or not loaded yet.</p>
+            </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="text-left border-b border-gray-100">
-                    <th className="pb-2 pr-4 font-medium text-gray-600">Username</th>
-                    <th className="pb-2 pr-4 font-medium text-gray-600">Profile</th>
-                    <th className="pb-2 pr-4 font-medium text-gray-600">Status</th>
-                    <th className="pb-2 font-medium text-gray-600">Comment</th>
+                  <tr className="bg-[#0d1526] border-b border-gray-700">
+                    <th className="px-5 py-3 text-left text-xs font-semibold text-text-secondary uppercase tracking-wider">Username</th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold text-text-secondary uppercase tracking-wider">Profile</th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold text-text-secondary uppercase tracking-wider">Status</th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold text-text-secondary uppercase tracking-wider">Comment</th>
                   </tr>
                 </thead>
                 <tbody>
                   {pppoeSecrets.map(s => (
-                    <tr key={s.name} className="border-b border-gray-50 last:border-0">
-                      <td className="py-2 pr-4 font-mono text-gray-900">{s.name}</td>
-                      <td className="py-2 pr-4 text-gray-700">{s.profile}</td>
-                      <td className="py-2 pr-4">
+                    <tr key={s.name} className="border-b border-gray-700 last:border-0 hover:bg-white/[0.02] transition-colors">
+                      <td className="px-5 py-3 font-mono text-gray-300">{s.name}</td>
+                      <td className="px-5 py-3 text-gray-300">{s.profile}</td>
+                      <td className="px-5 py-3">
                         <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
                           s.disabled
-                            ? 'bg-red-100 text-red-700'
-                            : 'bg-green-100 text-green-700'
+                            ? 'bg-destructive/10 text-destructive'
+                            : 'bg-accent/10 text-accent'
                         }`}>
                           {s.disabled ? 'Disabled' : 'Active'}
                         </span>
                       </td>
-                      <td className="py-2 text-gray-500 text-xs">{s.comment}</td>
+                      <td className="px-5 py-3 text-gray-300 text-xs">{s.comment}</td>
                     </tr>
                   ))}
                 </tbody>

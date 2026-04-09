@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { toast } from 'sonner';
 import api from '../../lib/api';
 import type { User, UserRole, UserStatus } from '../../lib/types';
 
@@ -109,8 +110,10 @@ export default function Staff() {
       setModalOpen(false);
       setLoading(true);
       await fetchUsers();
+      toast.success(editingId ? 'Staff member updated' : 'Staff member added');
     } catch {
       setError(editingId ? 'Failed to update staff member' : 'Failed to add staff member');
+      toast.error('Something went wrong');
     } finally {
       setSubmitting(false);
     }
@@ -122,8 +125,10 @@ export default function Staff() {
       setDeleteConfirm(null);
       setLoading(true);
       await fetchUsers();
+      toast.success('Staff member removed');
     } catch {
       setError('Failed to delete staff member');
+      toast.error('Something went wrong');
     }
   };
 

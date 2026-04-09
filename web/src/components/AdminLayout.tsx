@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { clearTokens, getCurrentUser } from '../lib/auth';
+import api from '../lib/api';
 
 interface NavItem {
   label: string;
@@ -134,10 +135,12 @@ function NavSection({
   label,
   items,
   onItemClick,
+  badgeMap = {},
 }: {
   label: string;
   items: NavItem[];
   onItemClick?: () => void;
+  badgeMap?: Record<string, number>;
 }) {
   return (
     <div>
@@ -145,31 +148,39 @@ function NavSection({
         {label}
       </p>
       <div className="space-y-1">
-        {items.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            end={item.end}
-            onClick={onItemClick}
-            className={({ isActive }) =>
-              `group flex items-center gap-3 px-3 h-10 rounded-[10px] font-body text-[14px] transition-all duration-200 relative ${
-                isActive
-                  ? 'bg-[rgba(34,211,238,0.06)] text-secondary'
-                  : 'text-[#64748b] hover:text-[#94a3b8] hover:bg-[rgba(255,255,255,0.02)]'
-              }`
-            }
-          >
-            {({ isActive }) => (
-              <>
-                {isActive && (
-                  <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 bg-secondary rounded-r-full" />
-                )}
-                {item.icon}
-                <span>{item.label}</span>
-              </>
-            )}
-          </NavLink>
-        ))}
+        {items.map((item) => {
+          const badge = badgeMap[item.to] ?? 0;
+          return (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              end={item.end}
+              onClick={onItemClick}
+              className={({ isActive }) =>
+                `group flex items-center gap-3 px-3 h-10 rounded-[10px] font-body text-[14px] transition-all duration-200 relative ${
+                  isActive
+                    ? 'bg-[rgba(34,211,238,0.06)] text-secondary'
+                    : 'text-[#64748b] hover:text-[#94a3b8] hover:bg-[rgba(255,255,255,0.02)]'
+                }`
+              }
+            >
+              {({ isActive }) => (
+                <>
+                  {isActive && (
+                    <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 bg-secondary rounded-r-full" />
+                  )}
+                  {item.icon}
+                  <span>{item.label}</span>
+                  {badge > 0 && (
+                    <span className="ml-auto bg-amber-500 text-white text-xs font-bold rounded-full px-1.5 py-0.5 min-w-[18px] text-center">
+                      {badge > 99 ? '99+' : badge}
+                    </span>
+                  )}
+                </>
+              )}
+            </NavLink>
+          );
+        })}
       </div>
     </div>
   );
@@ -177,9 +188,24 @@ function NavSection({
 
 export default function AdminLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [pendingCount, setPendingCount] = useState(0);
   const navigate = useNavigate();
   const location = useLocation();
   const user = getCurrentUser();
+
+  useEffect(() => {
+    const fetchPending = async () => {
+      try {
+        const res = await api.get('/payments?status=pending&page=1&limit=1');
+        setPendingCount(res.data?.total ?? 0);
+      } catch {
+        // silently ignore
+      }
+    };
+    fetchPending();
+    const interval = setInterval(fetchPending, 60000);
+    return () => clearInterval(interval);
+  }, []);
 
   const handleLogout = () => {
     clearTokens();
@@ -233,6 +259,7 @@ export default function AdminLayout() {
           label="Main"
           items={mainItems}
           onItemClick={() => setSidebarOpen(false)}
+          badgeMap={{ '/admin/payments': pendingCount }}
         />
         <NavSection
           label="System"

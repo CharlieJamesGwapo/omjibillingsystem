@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
+import { toast } from 'sonner';
 import api from '../../lib/api';
+import { formatDate } from '../../lib/utils';
 import type { User, UserStatus } from '../../lib/types';
 
 interface CustomerForm {
@@ -108,8 +110,10 @@ export default function Customers() {
       setModalOpen(false);
       setLoading(true);
       await fetchUsers();
+      toast.success(editingId ? 'Customer updated' : 'Customer created');
     } catch {
       setError(editingId ? 'Failed to update customer' : 'Failed to add customer');
+      toast.error('Something went wrong');
     } finally {
       setSubmitting(false);
     }
