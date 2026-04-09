@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { clearTokens, getCurrentUser } from '../lib/auth';
 import api from '../lib/api';
+import NotificationCenter from './NotificationCenter';
 
 interface NavItem {
   label: string;
@@ -335,6 +336,9 @@ export default function AdminLayout() {
               OMJI
             </span>
           </div>
+          <div className="ml-auto">
+            <NotificationCenter />
+          </div>
         </header>
 
         {/* Desktop breadcrumb bar */}
@@ -345,6 +349,9 @@ export default function AdminLayout() {
               <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
             </svg>
             <span className="font-body text-text-primary font-medium">{currentPage}</span>
+          </div>
+          <div className="ml-auto">
+            <NotificationCenter />
           </div>
         </header>
 
