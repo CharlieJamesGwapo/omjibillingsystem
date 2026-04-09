@@ -190,9 +190,21 @@ function NavSection({
 export default function AdminLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
+  const [brandName, setBrandName] = useState('OMJI');
+  const [brandLogo, setBrandLogo] = useState('');
+  const [brandTagline, setBrandTagline] = useState('Billing System');
   const navigate = useNavigate();
   const location = useLocation();
   const user = getCurrentUser();
+
+  useEffect(() => {
+    api.get<Record<string, string>>('/settings').then(res => {
+      const s = res.data
+      if (s.brand_name) setBrandName(s.brand_name)
+      if (s.brand_logo_url) setBrandLogo(s.brand_logo_url)
+      if (s.brand_tagline) setBrandTagline(s.brand_tagline)
+    }).catch(() => {}) // non-fatal
+  }, []);
 
   useEffect(() => {
     const fetchPending = async () => {
@@ -236,18 +248,16 @@ export default function AdminLayout() {
     <nav className="flex flex-col h-full">
       {/* Logo area */}
       <div className="p-5 flex items-center gap-3">
-        <img
-          src="/lego.jpeg"
-          alt="OMJI"
-          className="w-9 h-9 rounded-full object-cover ring-1 ring-[rgba(34,211,238,0.1)]"
-        />
-        <div>
-          <h1 className="font-heading text-[15px] font-bold text-text-primary leading-tight tracking-wide">
-            OMJI
-          </h1>
-          <p className="font-body text-[11px] text-[#475569] leading-tight">
-            Billing System
-          </p>
+        {brandLogo ? (
+          <img src={brandLogo} alt={brandName} className="h-8 w-8 rounded-lg object-contain" />
+        ) : (
+          <div className="h-8 w-8 rounded-lg bg-secondary/20 flex items-center justify-center">
+            <span className="text-secondary font-heading font-bold text-sm">{brandName.charAt(0)}</span>
+          </div>
+        )}
+        <div className="flex flex-col">
+          <span className="font-heading font-bold text-sm text-text-primary leading-tight">{brandName}</span>
+          <span className="font-body text-xs text-[#64748b] leading-tight">{brandTagline}</span>
         </div>
       </div>
 
@@ -331,9 +341,15 @@ export default function AdminLayout() {
             </svg>
           </button>
           <div className="flex items-center gap-2 ml-3">
-            <img src="/lego.jpeg" alt="OMJI" className="w-7 h-7 rounded-full object-cover" />
+            {brandLogo ? (
+              <img src={brandLogo} alt={brandName} className="w-7 h-7 rounded-lg object-contain" />
+            ) : (
+              <div className="w-7 h-7 rounded-lg bg-secondary/20 flex items-center justify-center">
+                <span className="text-secondary font-heading font-bold text-xs">{brandName.charAt(0)}</span>
+              </div>
+            )}
             <span className="font-heading text-[14px] font-bold text-text-primary tracking-wide">
-              OMJI
+              {brandName}
             </span>
           </div>
           <div className="ml-auto">

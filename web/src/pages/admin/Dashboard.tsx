@@ -370,7 +370,7 @@ export default function Dashboard() {
       <div className="flex flex-col lg:flex-row gap-6 animate-in animate-in-2">
 
         {/* Revenue Trend (60%) */}
-        <div className="glass-card p-6 flex-[3] bg-[#0d1526]">
+        <div className="glass-card p-6 flex-[3] bg-[#0d1526] min-h-[280px]">
           <div className="flex items-center justify-between mb-5">
             <div>
               <h2 className="font-heading text-lg font-bold text-text-primary">Revenue Trend</h2>
@@ -378,8 +378,11 @@ export default function Dashboard() {
             </div>
           </div>
           {chartData.length === 0 ? (
-            <div className="flex items-center justify-center h-56 text-[#64748b] font-body text-sm">
-              No chart data available
+            <div className="flex flex-col items-center justify-center h-56 gap-3 text-[#64748b]">
+              <svg className="w-10 h-10 opacity-30" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
+              </svg>
+              <p className="font-body text-sm">Revenue data will appear once payments are recorded</p>
             </div>
           ) : (
             <ResponsiveContainer width="100%" height={220}>

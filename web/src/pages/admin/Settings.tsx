@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import api from '../../lib/api';
 
-type TabKey = 'sms' | 'mikrotik' | 'company' | 'notifications';
+type TabKey = 'sms' | 'mikrotik' | 'company' | 'notifications' | 'branding';
 
 interface SettingsMap {
   [key: string]: string;
@@ -12,6 +12,7 @@ const TABS: { key: TabKey; label: string }[] = [
   { key: 'mikrotik', label: 'MikroTik' },
   { key: 'company', label: 'Company' },
   { key: 'notifications', label: 'Notifications' },
+  { key: 'branding', label: 'Branding' },
 ];
 
 export default function Settings() {
@@ -20,7 +21,7 @@ export default function Settings() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
-  const [dirty, setDirty] = useState<Record<TabKey, boolean>>({ sms: false, mikrotik: false, company: false, notifications: false });
+  const [dirty, setDirty] = useState<Record<TabKey, boolean>>({ sms: false, mikrotik: false, company: false, notifications: false, branding: false });
 
   // SMS test
   const [testPhone, setTestPhone] = useState('');
@@ -485,6 +486,98 @@ export default function Settings() {
                 className="btn-primary"
               >
                 {saving ? 'Saving...' : 'Save Changes'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Branding Tab */}
+      {activeTab === 'branding' && (
+        <div className="glass-card p-8 animate-in animate-in-2">
+          <div className="space-y-6">
+            <div>
+              <h3 className="font-heading text-base font-semibold text-text-primary mb-4">Brand Identity</h3>
+              <div className="grid grid-cols-1 gap-4">
+
+                <div>
+                  <label className="block text-xs font-medium text-[#94a3b8] mb-1.5">Brand Name</label>
+                  <input
+                    type="text"
+                    value={settings.brand_name ?? ''}
+                    onChange={e => updateSetting('brand_name', e.target.value, 'branding')}
+                    placeholder="e.g. OMJI Internet"
+                    className="input-field w-full"
+                  />
+                  <p className="text-xs text-[#64748b] mt-1">Shown in the sidebar and throughout the admin panel</p>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-[#94a3b8] mb-1.5">Tagline</label>
+                  <input
+                    type="text"
+                    value={settings.brand_tagline ?? ''}
+                    onChange={e => updateSetting('brand_tagline', e.target.value, 'branding')}
+                    placeholder="e.g. Billing System"
+                    className="input-field w-full"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-[#94a3b8] mb-1.5">Logo URL</label>
+                  <input
+                    type="url"
+                    value={settings.brand_logo_url ?? ''}
+                    onChange={e => updateSetting('brand_logo_url', e.target.value, 'branding')}
+                    placeholder="https://example.com/logo.png"
+                    className="input-field w-full"
+                  />
+                  <p className="text-xs text-[#64748b] mt-1">Direct link to your logo image (PNG, SVG recommended). Leave blank to use the initial letter.</p>
+                  {settings.brand_logo_url && (
+                    <div className="mt-2 flex items-center gap-2">
+                      <img
+                        src={settings.brand_logo_url}
+                        alt="Logo preview"
+                        className="h-10 w-10 rounded-lg object-contain border border-gray-700"
+                        onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
+                      />
+                      <span className="text-xs text-[#64748b]">Preview</span>
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-[#94a3b8] mb-1.5">Company Phone</label>
+                  <input
+                    type="text"
+                    value={settings.company_phone ?? ''}
+                    onChange={e => updateSetting('company_phone', e.target.value, 'branding')}
+                    placeholder="e.g. 09xx-xxx-xxxx"
+                    className="input-field w-full"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-[#94a3b8] mb-1.5">Company Address</label>
+                  <textarea
+                    value={settings.company_address ?? ''}
+                    onChange={e => updateSetting('company_address', e.target.value, 'branding')}
+                    placeholder="Full business address"
+                    rows={2}
+                    className="input-field w-full resize-none"
+                  />
+                </div>
+
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-2">
+              <button
+                onClick={() => saveSettings(['brand_name', 'brand_tagline', 'brand_logo_url', 'company_phone', 'company_address'])}
+                disabled={!dirty.branding}
+                className="btn-primary disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Save Branding
               </button>
             </div>
           </div>
