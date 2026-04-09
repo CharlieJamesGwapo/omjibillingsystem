@@ -152,6 +152,10 @@ export default function Customers() {
           role: 'customer',
           ...(form.email && { email: form.email }),
           ...(form.address && { address: form.address }),
+          ...(form.latitude && form.longitude && {
+            latitude: parseFloat(form.latitude),
+            longitude: parseFloat(form.longitude),
+          }),
         });
       }
       setModalOpen(false);
@@ -516,8 +520,7 @@ export default function Customers() {
                   className="form-input"
                 />
               </div>
-              {editingId && (
-                <div>
+              <div>
                   <label className="form-label">
                     GPS Coordinates
                     <span className="ml-2 text-[#475569] text-xs font-normal">(for technician navigation)</span>
@@ -571,7 +574,6 @@ export default function Customers() {
                     </a>
                   )}
                 </div>
-              )}
               {editingId && (
                 <div>
                   <label className="form-label">Status</label>
