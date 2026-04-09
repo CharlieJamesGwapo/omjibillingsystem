@@ -15,6 +15,7 @@ type Config struct {
 	MikroTikPort    int
 	MikroTikUser    string
 	MikroTikPass    string
+	AgentSecret     string
 	SMSProvider     string
 	SMSAPIKey       string
 	SMSBaseURL      string
@@ -50,6 +51,12 @@ func Load() (*Config, error) {
 		MikroTikPort:     mtPort,
 		MikroTikUser:     os.Getenv("MIKROTIK_USER"),
 		MikroTikPass:     os.Getenv("MIKROTIK_PASSWORD"),
+		AgentSecret: func() string {
+			if s := os.Getenv("AGENT_SECRET"); s != "" {
+				return s
+			}
+			return "changeme-agent-secret"
+		}(),
 		SMSProvider:      os.Getenv("SMS_PROVIDER"),
 		SMSAPIKey:        os.Getenv("SMS_API_KEY"),
 		SMSBaseURL:       os.Getenv("SMS_BASE_URL"),

@@ -90,8 +90,8 @@ func (s *Scheduler) checkOverdue() {
 	}
 
 	for _, sub := range subs {
-		if err := s.subService.Disconnect(ctx, sub.ID); err != nil {
-			log.Printf("[CRON] Failed to disconnect subscription %s: %v", sub.ID, err)
+		if err := s.subService.MarkOverdue(ctx, sub.ID); err != nil {
+			log.Printf("[CRON] Failed to mark subscription %s overdue: %v", sub.ID, err)
 			continue
 		}
 

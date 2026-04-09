@@ -103,11 +103,15 @@ func main() {
 	}
 	mtManager := mikrotik.NewManager(initialMTClient)
 
+	// ---- Agent Hub ----
+	agentHub := mikrotik.NewAgentHub(cfg.AgentSecret)
+	log.Printf("[AgentHub] Configured (secret length: %d)", len(cfg.AgentSecret))
+
 	// ---- Services ----
 	authSvc := service.NewAuthService(userRepo, otpRepo, smsProvider, cfg.JWTSecret, cfg.JWTRefreshSecret)
 	userSvc := service.NewUserService(userRepo, authSvc)
 	planSvc := service.NewPlanService(planRepo)
-	subSvc := service.NewSubscriptionService(subRepo, planRepo, mtManager)
+	subSvc := service.NewSubscriptionService(subRepo, planRepo, mtManager, agentHub)
 	paymentSvc := service.NewPaymentService(paymentRepo, subRepo, subSvc)
 	dashSvc := service.NewDashboardService(dashRepo, logRepo)
 
@@ -118,7 +122,7 @@ func main() {
 	subH := handler.NewSubscriptionHandler(subSvc, subRepo)
 	payH := handler.NewPaymentHandler(paymentSvc, paymentRepo)
 	dashH := handler.NewDashboardHandler(dashSvc, logRepo)
-	mtH := handler.NewMikroTikHandler(mtManager, settingsRepo)
+	mtH := handler.NewMikroTikHandler(mtManager, agentHub, settingsRepo)
 	notifH := handler.NewNotificationHandler(subSvc, smsProvider)
 	settingsH := handler.NewSettingsHandler(settingsRepo, smsProvider)
 	msgH := handler.NewMessageHandler(messageRepo, userRepo, subSvc, settingsRepo)
@@ -130,17 +134,18 @@ func main() {
 
 	// ---- Router ----
 	h := router.New(router.Deps{
-		AuthService:  authSvc,
-		AuthHandler:  authH,
-		UserHandler:  userH,
-		PlanHandler:  planH,
-		SubHandler:   subH,
-		PayHandler:   payH,
-		DashHandler:  dashH,
+		AuthService:     authSvc,
+		AuthHandler:     authH,
+		UserHandler:     userH,
+		PlanHandler:     planH,
+		SubHandler:      subH,
+		PayHandler:      payH,
+		DashHandler:     dashH,
 		MTHandler:       mtH,
 		NotifHandler:    notifH,
 		SettingsHandler: settingsH,
 		MsgHandler:      msgH,
+		AgentHub:        agentHub,
 	}, cfg.CORSOrigins)
 
 	addr := ":" + cfg.Port
