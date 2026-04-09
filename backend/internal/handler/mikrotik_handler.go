@@ -135,14 +135,20 @@ func (h *MikroTikHandler) SaveAndConnect(w http.ResponseWriter, r *http.Request)
 	})
 }
 
+// getExecutor returns the best available MikroTik executor (agent hub preferred, then direct client).
+func (h *MikroTikHandler) getExecutor() mikrotik.MikroTikExecutor {
+	if h.agentHub != nil && h.agentHub.IsConnected() {
+		return h.agentHub
+	}
+	if c := h.manager.Get(); c != nil {
+		return c
+	}
+	return nil
+}
+
 // ListPPPoESecrets returns all PPPoE secrets from MikroTik via agent or direct connection.
 func (h *MikroTikHandler) ListPPPoESecrets(w http.ResponseWriter, r *http.Request) {
-	var executor mikrotik.MikroTikExecutor
-	if h.agentHub.IsConnected() {
-		executor = h.agentHub
-	} else if c := h.manager.Get(); c != nil {
-		executor = c
-	}
+	executor := h.getExecutor()
 	if executor == nil {
 		writeError(w, http.StatusServiceUnavailable, "MikroTik not connected")
 		return
@@ -154,4 +160,56 @@ func (h *MikroTikHandler) ListPPPoESecrets(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	writeJSON(w, http.StatusOK, secrets)
+}
+
+// CreatePPPoESecret handles POST /api/mikrotik/pppoe/secrets
+func (h *MikroTikHandler) CreatePPPoESecret(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Username string `json:"username"`
+		Password string `json:"password"`
+		Profile  string `json:"profile"`
+		Comment  string `json:"comment"`
+	}
+	if err := decodeJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if req.Username == "" || req.Password == "" {
+		writeError(w, http.StatusBadRequest, "username and password are required")
+		return
+	}
+	profile := req.Profile
+	if profile == "" {
+		profile = "default"
+	}
+
+	mt := h.getExecutor()
+	if mt == nil {
+		writeError(w, http.StatusServiceUnavailable, "MikroTik not connected")
+		return
+	}
+	if err := mt.AddPPPoESecret(req.Username, req.Password, profile); err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to create PPPoE secret: "+err.Error())
+		return
+	}
+	writeJSON(w, http.StatusCreated, map[string]string{"message": "PPPoE secret created"})
+}
+
+// DeletePPPoESecret handles DELETE /api/mikrotik/pppoe/secrets/:name
+func (h *MikroTikHandler) DeletePPPoESecret(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("name")
+	if name == "" {
+		writeError(w, http.StatusBadRequest, "name is required")
+		return
+	}
+	mt := h.getExecutor()
+	if mt == nil {
+		writeError(w, http.StatusServiceUnavailable, "MikroTik not connected")
+		return
+	}
+	if err := mt.DeletePPPoESecret(name); err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to delete PPPoE secret: "+err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"message": "PPPoE secret deleted"})
 }

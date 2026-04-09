@@ -101,6 +101,8 @@ func New(deps Deps, corsOrigins string) http.Handler {
 
 	// --- MikroTik PPPoE ---
 	mux.Handle("GET /api/mikrotik/pppoe/secrets", chain(deps.MTHandler.ListPPPoESecrets, authMW, adminOrTech))
+	mux.Handle("POST /api/mikrotik/pppoe/secrets", adminOnly(http.HandlerFunc(deps.MTHandler.CreatePPPoESecret)))
+	mux.Handle("DELETE /api/mikrotik/pppoe/secrets/{name}", adminOnly(http.HandlerFunc(deps.MTHandler.DeletePPPoESecret)))
 
 	// --- Agent WebSocket (token-auth inside ServeHTTP) ---
 	mux.Handle("GET /ws/agent", deps.AgentHub)

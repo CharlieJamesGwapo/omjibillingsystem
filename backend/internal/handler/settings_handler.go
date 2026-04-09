@@ -37,7 +37,7 @@ func maskValue(value string) string {
 	return "••••••"
 }
 
-// GetSettings returns all settings grouped by category. Sensitive values are masked.
+// GetSettings returns all settings as a flat key→value map. Sensitive values are masked.
 func (h *SettingsHandler) GetSettings(w http.ResponseWriter, r *http.Request) {
 	settings, err := h.settingsRepo.GetAll(r.Context())
 	if err != nil {
@@ -45,16 +45,16 @@ func (h *SettingsHandler) GetSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Group by category and mask sensitive values
-	grouped := make(map[string][]repository.Setting)
+	flat := make(map[string]string, len(settings))
 	for _, s := range settings {
+		value := s.Value
 		if isSensitiveKey(s.Key) {
-			s.Value = maskValue(s.Value)
+			value = maskValue(s.Value)
 		}
-		grouped[s.Category] = append(grouped[s.Category], s)
+		flat[s.Key] = value
 	}
 
-	writeJSON(w, http.StatusOK, grouped)
+	writeJSON(w, http.StatusOK, flat)
 }
 
 // UpdateSettings updates multiple settings at once.
