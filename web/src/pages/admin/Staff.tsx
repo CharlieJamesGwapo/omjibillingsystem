@@ -45,16 +45,17 @@ export default function Staff() {
 
   const fetchUsers = async () => {
     try {
-      const params = new URLSearchParams({
-        page: String(page),
-        limit: String(LIMIT),
-      });
-      if (debouncedSearch) params.set('search', debouncedSearch);
-      const res = await api.get<{ data: User[]; total: number; page: number; limit: number }>(`/users?${params}`);
-      const allUsers = res.data.data ?? [];
-      const staffOnly = allUsers.filter((u) => u.role === 'admin' || u.role === 'technician');
-      setUsers(staffOnly);
-      setTotal(res.data.total ?? 0);
+      const search = debouncedSearch ? `&search=${encodeURIComponent(debouncedSearch)}` : '';
+      const [adminsRes, techRes] = await Promise.all([
+        api.get<{ data: User[]; total: number }>(`/users?role=admin&limit=100${search}`),
+        api.get<{ data: User[]; total: number }>(`/users?role=technician&limit=100${search}`),
+      ]);
+      const combined = [...(adminsRes.data.data ?? []), ...(techRes.data.data ?? [])];
+      const staffTotal = (adminsRes.data.total ?? 0) + (techRes.data.total ?? 0);
+      // Client-side pagination on combined result
+      const start = (page - 1) * LIMIT;
+      setUsers(combined.slice(start, start + LIMIT));
+      setTotal(staffTotal);
     } catch {
       setError('Failed to load staff');
     } finally {

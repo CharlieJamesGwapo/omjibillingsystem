@@ -33,8 +33,8 @@ func (h *UserHandler) List(w http.ResponseWriter, r *http.Request) {
 	if limit < 1 {
 		limit = 20
 	}
-	if limit > 100 {
-		limit = 100
+	if limit > 1000 {
+		limit = 1000
 	}
 	offset := (page - 1) * limit
 	search := r.URL.Query().Get("search")

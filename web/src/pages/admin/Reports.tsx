@@ -114,8 +114,10 @@ export default function Reports() {
   useEffect(() => {
     async function fetchIncome() {
       try {
-        const res = await api.get<MonthlyIncome[]>('/dashboard/income')
-        const data = (res.data ?? []).slice().sort((a, b) => a.month.localeCompare(b.month))
+        const res = await api.get<Array<{ month: string; label?: string; income?: number; amount?: number }>>('/dashboard/chart')
+        const data: MonthlyIncome[] = (res.data ?? [])
+          .map(d => ({ month: d.month, amount: d.amount ?? d.income ?? 0 }))
+          .sort((a, b) => a.month.localeCompare(b.month))
         setIncome(data)
 
         // Default: last 12 months (or all if less than 12)

@@ -113,7 +113,7 @@ export default function ActivityLogs() {
         const map = new Map<string, string>()
         const users = res.data.data ?? []
         users.forEach((u) => {
-          map.set(u.id, u.name ?? u.phone ?? u.id.slice(0, 8))
+          map.set(u.id, u.full_name ?? u.phone ?? u.id.slice(0, 8))
         })
         setUserMap(map)
       })

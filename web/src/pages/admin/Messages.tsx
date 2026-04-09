@@ -353,10 +353,10 @@ export default function Messages() {
   const fetchHistory = useCallback(async (page: number) => {
     setHistoryLoading(true);
     try {
-      const res = await api.get<{ data: MessageRecord[] | null; total?: number }>(
+      const res = await api.get<{ messages: MessageRecord[] | null; total?: number }>(
         `/messages?page=${page}&limit=20`
       );
-      const data = res.data.data ?? [];
+      const data = res.data.messages ?? [];
       setMessages(data);
       setHistoryTotal(res.data.total ?? data.length);
     } catch {
@@ -452,7 +452,7 @@ export default function Messages() {
     setSending(true);
     try {
       const res = await api.post<{ sent: number; failed: number }>('/messages/template', {
-        template: selectedTemplateId,
+        template: selectedTemplate?.name ?? selectedTemplateId,
         filter: groupFilter,
       });
       const d = res.data;
