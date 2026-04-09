@@ -8,6 +8,7 @@ interface PlanForm {
   price: number;
   description: string;
   is_active: boolean;
+  mikrotik_profile?: string;
 }
 
 const emptyForm: PlanForm = {
@@ -16,6 +17,7 @@ const emptyForm: PlanForm = {
   price: 0,
   description: '',
   is_active: true,
+  mikrotik_profile: undefined,
 };
 
 export default function Plans() {
@@ -58,6 +60,7 @@ export default function Plans() {
       price: plan.price,
       description: plan.description || '',
       is_active: plan.is_active,
+      mikrotik_profile: plan.mikrotik_profile || undefined,
     });
     setEditingId(plan.id);
     setModalOpen(true);
@@ -83,6 +86,7 @@ export default function Plans() {
         price: form.price,
         is_active: form.is_active,
         ...(form.description && { description: form.description }),
+        ...(form.mikrotik_profile && { mikrotik_profile: form.mikrotik_profile }),
       };
       if (editingId) {
         await api.put(`/plans/${editingId}`, body);
@@ -278,6 +282,21 @@ export default function Plans() {
                   className="form-input"
                   style={{ resize: 'none' }}
                 />
+              </div>
+              <div>
+                <label className="form-label">
+                  MikroTik Profile <span className="text-[#475569] font-normal text-xs">(optional)</span>
+                </label>
+                <input
+                  type="text"
+                  value={form.mikrotik_profile ?? ''}
+                  onChange={(e) => setForm((f: PlanForm) => ({ ...f, mikrotik_profile: e.target.value || undefined }))}
+                  placeholder="e.g. PLAN10M"
+                  className="form-input"
+                />
+                <p className="text-xs mt-1" style={{ color: '#475569' }}>
+                  Must match the PPPoE profile name in MikroTik exactly
+                </p>
               </div>
               <div className="flex items-center gap-3">
                 <input

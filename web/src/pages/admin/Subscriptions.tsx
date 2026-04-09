@@ -8,6 +8,8 @@ interface SubForm {
   ip_address: string;
   mac_address: string;
   billing_day: string;
+  pppoe_username?: string;
+  pppoe_password?: string;
 }
 
 const emptyForm: SubForm = {
@@ -16,6 +18,8 @@ const emptyForm: SubForm = {
   ip_address: '',
   mac_address: '',
   billing_day: '1',
+  pppoe_username: undefined,
+  pppoe_password: undefined,
 };
 
 const LIMIT = 20;
@@ -113,6 +117,8 @@ export default function Subscriptions() {
       ip_address: sub.ip_address || '',
       mac_address: sub.mac_address || '',
       billing_day: String(sub.billing_day),
+      pppoe_username: sub.pppoe_username || undefined,
+      pppoe_password: sub.pppoe_password || undefined,
     });
     setEditingId(sub.id);
     setModalOpen(true);
@@ -128,6 +134,8 @@ export default function Subscriptions() {
         billing_day: Number(form.billing_day),
         ...(form.ip_address && { ip_address: form.ip_address }),
         ...(form.mac_address && { mac_address: form.mac_address }),
+        ...(form.pppoe_username && { pppoe_username: form.pppoe_username }),
+        ...(form.pppoe_password && { pppoe_password: form.pppoe_password }),
       };
       if (editingId) {
         await api.put(`/subscriptions/${editingId}`, body);
@@ -540,6 +548,32 @@ export default function Subscriptions() {
                     value={form.mac_address}
                     onChange={(e) => setForm({ ...form, mac_address: e.target.value })}
                     placeholder="AA:BB:CC:DD:EE:FF"
+                    className="form-input"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="form-label">
+                    PPPoE Username <span className="text-[#475569] font-normal text-xs">(optional)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={form.pppoe_username ?? ''}
+                    onChange={(e) => setForm((f: SubForm) => ({ ...f, pppoe_username: e.target.value || undefined }))}
+                    placeholder="e.g. client01"
+                    className="form-input"
+                  />
+                </div>
+                <div>
+                  <label className="form-label">
+                    PPPoE Password <span className="text-[#475569] font-normal text-xs">(optional)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={form.pppoe_password ?? ''}
+                    onChange={(e) => setForm((f: SubForm) => ({ ...f, pppoe_password: e.target.value || undefined }))}
+                    placeholder="e.g. password123"
                     className="form-input"
                   />
                 </div>
