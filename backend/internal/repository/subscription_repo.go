@@ -249,7 +249,7 @@ func (r *SubscriptionRepo) AdvanceDueDate(ctx context.Context, id uuid.UUID) err
 
 func (r *SubscriptionRepo) GetOverdue(ctx context.Context) ([]*model.Subscription, error) {
 	query := subscriptionSelectJoin + `
-		WHERE s.status != 'suspended'
+		WHERE s.status NOT IN ('suspended', 'overdue')
 		AND (s.next_due_date + (s.grace_days || ' days')::interval) < NOW()
 		ORDER BY s.next_due_date ASC`
 

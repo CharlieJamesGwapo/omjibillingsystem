@@ -32,6 +32,7 @@ type AgentResponse struct {
 type AgentHub struct {
 	secret   string
 	mu       sync.Mutex
+	wmu      sync.Mutex // protects concurrent WebSocket writes
 	conn     *websocket.Conn
 	pending  map[string]chan AgentResponse
 	upgrader websocket.Upgrader
@@ -124,11 +125,14 @@ func (h *AgentHub) execute(op string, params map[string]string) ([]map[string]st
 	h.mu.Unlock()
 
 	cmd := AgentCommand{ID: cmdID, Op: op, Params: params}
-	if err := conn.WriteJSON(cmd); err != nil {
+	h.wmu.Lock()
+	writeErr := conn.WriteJSON(cmd)
+	h.wmu.Unlock()
+	if writeErr != nil {
 		h.mu.Lock()
 		delete(h.pending, cmdID)
 		h.mu.Unlock()
-		return nil, fmt.Errorf("send command to agent: %w", err)
+		return nil, fmt.Errorf("send command to agent: %w", writeErr)
 	}
 
 	select {

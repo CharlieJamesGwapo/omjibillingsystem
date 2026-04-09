@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"strconv"
 )
@@ -52,10 +53,12 @@ func Load() (*Config, error) {
 		MikroTikUser:     os.Getenv("MIKROTIK_USER"),
 		MikroTikPass:     os.Getenv("MIKROTIK_PASSWORD"),
 		AgentSecret: func() string {
-			if s := os.Getenv("AGENT_SECRET"); s != "" {
-				return s
+			s := os.Getenv("AGENT_SECRET")
+			if s == "" {
+				log.Println("[WARNING] AGENT_SECRET is not set. Using default — NOT safe for production.")
+				return "changeme-agent-secret"
 			}
-			return "changeme-agent-secret"
+			return s
 		}(),
 		SMSProvider:      os.Getenv("SMS_PROVIDER"),
 		SMSAPIKey:        os.Getenv("SMS_API_KEY"),
