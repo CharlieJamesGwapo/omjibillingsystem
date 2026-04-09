@@ -187,7 +187,11 @@ export default function TechnicianProfileScreen() {
           <Avatar name={user?.full_name ?? 'User'} size={64} style={styles.avatar} />
           <Text style={styles.fullName}>{user?.full_name ?? 'User'}</Text>
           <View style={styles.roleBadge}>
-            <Text style={styles.roleText}>Technician</Text>
+            <Text style={styles.roleText}>
+              {user?.role
+                ? user.role.charAt(0).toUpperCase() + user.role.slice(1)
+                : 'Technician'}
+            </Text>
           </View>
           <Text style={styles.phone}>{user?.phone ?? ''}</Text>
         </LinearGradient>

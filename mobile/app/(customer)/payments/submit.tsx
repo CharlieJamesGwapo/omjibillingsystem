@@ -46,6 +46,8 @@ export default function SubmitPaymentScreen() {
 
   const [method, setMethod] = useState<PaymentMethod | null>(null);
   const [referenceNumber, setReferenceNumber] = useState('');
+  const [billingStart, setBillingStart] = useState('');
+  const [billingEnd, setBillingEnd] = useState('');
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -81,6 +83,14 @@ export default function SubmitPaymentScreen() {
 
       if (referenceNumber.trim()) {
         formData.append('reference_number', referenceNumber.trim());
+      }
+
+      if (billingStart.trim()) {
+        formData.append('billing_period_start', billingStart.trim());
+      }
+
+      if (billingEnd.trim()) {
+        formData.append('billing_period_end', billingEnd.trim());
       }
 
       if (imageUri) {
@@ -209,6 +219,33 @@ export default function SubmitPaymentScreen() {
             </View>
           )}
 
+          {/* Billing Period */}
+          <Text style={styles.sectionLabel}>Billing Period</Text>
+          <View style={styles.billingRow}>
+            <View style={styles.billingField}>
+              <Text style={styles.billingFieldLabel}>Start Date</Text>
+              <Input
+                placeholder="YYYY-MM-DD"
+                value={billingStart}
+                onChangeText={setBillingStart}
+                icon="calendar-outline"
+                keyboardType="default"
+                autoCapitalize="none"
+              />
+            </View>
+            <View style={styles.billingField}>
+              <Text style={styles.billingFieldLabel}>End Date</Text>
+              <Input
+                placeholder="YYYY-MM-DD"
+                value={billingEnd}
+                onChangeText={setBillingEnd}
+                icon="calendar-outline"
+                keyboardType="default"
+                autoCapitalize="none"
+              />
+            </View>
+          </View>
+
           {/* Proof Upload */}
           <Text style={styles.sectionLabel}>Proof of Payment</Text>
           {imageUri ? (
@@ -330,6 +367,18 @@ const styles = StyleSheet.create({
   },
   inputSection: {
     marginBottom: 4,
+  },
+  billingRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  billingField: {
+    flex: 1,
+  },
+  billingFieldLabel: {
+    fontSize: 13,
+    color: Colors.grey500,
+    marginBottom: 6,
   },
   uploadArea: {
     height: 160,

@@ -69,7 +69,7 @@ export default function TechnicianHomeScreen() {
     {
       icon: 'alert-circle-outline' as const,
       label: 'Overdue',
-      onPress: () => router.push('/(technician)/clients'),
+      onPress: () => router.push('/(technician)/clients?status=overdue'),
       badge: stats?.overdue ?? 0,
     },
     {

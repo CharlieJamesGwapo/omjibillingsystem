@@ -9,7 +9,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Colors } from '@/constants/colors';
 import { useApi } from '@/hooks/useApi';
 import { getAllSubscriptions } from '@/services/subscriptions';
@@ -23,8 +23,11 @@ type FilterOption = 'all' | SubscriptionStatus;
 
 export default function TechnicianClientsScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ status?: string }>();
   const [search, setSearch] = useState('');
-  const [filter, setFilter] = useState<FilterOption>('all');
+  const [filter, setFilter] = useState<FilterOption>(
+    (params.status as FilterOption) ?? 'all',
+  );
 
   const {
     data: subscriptions,
