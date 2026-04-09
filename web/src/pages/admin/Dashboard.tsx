@@ -51,11 +51,11 @@ function LoadingSkeleton() {
       </div>
       {/* Charts row */}
       <div className="flex flex-col lg:flex-row gap-6 animate-in animate-in-2">
-        <div className="glass-card p-6 flex-[3]">
+        <div className="glass-card p-6" style={{ flex: '3 1 0%' }}>
           <SkeletonBlock className="h-5 w-40 mb-6" />
           <SkeletonBlock className="h-56 w-full rounded-lg" />
         </div>
-        <div className="glass-card p-6 flex-[2]">
+        <div className="glass-card p-6" style={{ flex: '2 1 0%' }}>
           <SkeletonBlock className="h-5 w-40 mb-6" />
           <SkeletonBlock className="h-56 w-full rounded-lg" />
         </div>
@@ -370,7 +370,7 @@ export default function Dashboard() {
       <div className="flex flex-col lg:flex-row gap-6 animate-in animate-in-2">
 
         {/* Revenue Trend (60%) */}
-        <div className="glass-card p-6 flex-[3] bg-[#0d1526] min-h-[280px]">
+        <div className="glass-card p-6 bg-[#0d1526]" style={{ flex: '3 1 0%', minHeight: '280px' }}>
           <div className="flex items-center justify-between mb-5">
             <div>
               <h2 className="font-heading text-lg font-bold text-text-primary">Revenue Trend</h2>
@@ -378,11 +378,11 @@ export default function Dashboard() {
             </div>
           </div>
           {chartData.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-56 gap-3 text-[#64748b]">
-              <svg className="w-10 h-10 opacity-30" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
+            <div style={{ height: '220px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '12px', color: '#475569', border: '1px dashed rgba(34,211,238,0.15)', borderRadius: '8px' }}>
+              <svg style={{ width: '40px', height: '40px', opacity: 0.4 }} fill="none" viewBox="0 0 24 24" stroke="#22d3ee" strokeWidth={1.2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />
               </svg>
-              <p className="font-body text-sm">Revenue data will appear once payments are recorded</p>
+              <p style={{ fontFamily: 'Outfit, sans-serif', fontSize: '13px', textAlign: 'center' }}>Revenue chart will appear once<br/>payments are approved</p>
             </div>
           ) : (
             <ResponsiveContainer width="100%" height={220}>
@@ -424,11 +424,14 @@ export default function Dashboard() {
         </div>
 
         {/* Subscription Status (40%) */}
-        <div className="glass-card p-6 flex-[2] bg-[#0d1526]">
+        <div className="glass-card p-6 bg-[#0d1526]" style={{ flex: '2 1 0%' }}>
           <h2 className="font-heading text-lg font-bold text-text-primary mb-5">Subscription Status</h2>
           {pieData.length === 0 ? (
-            <div className="flex items-center justify-center h-56 text-[#64748b] font-body text-sm">
-              No subscription data
+            <div style={{ height: '220px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '12px', color: '#475569', border: '1px dashed rgba(34,211,238,0.15)', borderRadius: '8px' }}>
+              <svg style={{ width: '40px', height: '40px', opacity: 0.4 }} fill="none" viewBox="0 0 24 24" stroke="#22d3ee" strokeWidth={1.2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 6a7.5 7.5 0 107.5 7.5h-7.5V6z" /><path strokeLinecap="round" strokeLinejoin="round" d="M13.5 10.5H21A7.5 7.5 0 0013.5 3v7.5z" />
+              </svg>
+              <p style={{ fontFamily: 'Outfit, sans-serif', fontSize: '13px' }}>No subscription data yet</p>
             </div>
           ) : (
             <ResponsiveContainer width="100%" height={220}>
