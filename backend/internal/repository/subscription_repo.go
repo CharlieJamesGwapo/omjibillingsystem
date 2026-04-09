@@ -21,7 +21,9 @@ func NewSubscriptionRepo(db *pgxpool.Pool) *SubscriptionRepo {
 
 const subscriptionSelectJoin = `
 	SELECT s.id, s.user_id, s.plan_id, s.ip_address, s.mac_address, s.billing_day,
-	       s.next_due_date, s.grace_days, s.status, s.mikrotik_queue_id, s.created_at, s.updated_at,
+	       s.next_due_date, s.grace_days, s.status, s.mikrotik_queue_id,
+	       s.pppoe_username, s.pppoe_password,
+	       s.created_at, s.updated_at,
 	       u.full_name, u.phone, p.name, p.speed_mbps, p.price
 	FROM subscriptions s
 	JOIN users u ON u.id = s.user_id
@@ -31,7 +33,9 @@ func scanSubscription(row interface{ Scan(...interface{}) error }) (*model.Subsc
 	s := &model.Subscription{}
 	err := row.Scan(
 		&s.ID, &s.UserID, &s.PlanID, &s.IPAddress, &s.MACAddress, &s.BillingDay,
-		&s.NextDueDate, &s.GraceDays, &s.Status, &s.MikroTikQueueID, &s.CreatedAt, &s.UpdatedAt,
+		&s.NextDueDate, &s.GraceDays, &s.Status, &s.MikroTikQueueID,
+		&s.PPPoEUsername, &s.PPPoEPassword,
+		&s.CreatedAt, &s.UpdatedAt,
 		&s.UserName, &s.UserPhone, &s.PlanName, &s.PlanSpeed, &s.PlanPrice,
 	)
 	return s, err
@@ -43,7 +47,6 @@ func (r *SubscriptionRepo) Create(ctx context.Context, req *model.CreateSubscrip
 		graceDays = *req.GraceDays
 	}
 
-	// Calculate next_due_date from billing_day
 	now := time.Now()
 	nextDue := time.Date(now.Year(), now.Month(), req.BillingDay, 0, 0, 0, 0, time.UTC)
 	if nextDue.Before(now) || nextDue.Equal(now) {
@@ -52,10 +55,11 @@ func (r *SubscriptionRepo) Create(ctx context.Context, req *model.CreateSubscrip
 
 	var subID uuid.UUID
 	err := r.db.QueryRow(ctx, `
-		INSERT INTO subscriptions (user_id, plan_id, ip_address, mac_address, billing_day, next_due_date, grace_days)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		INSERT INTO subscriptions (user_id, plan_id, ip_address, mac_address, billing_day, next_due_date, grace_days, pppoe_username, pppoe_password)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 		RETURNING id`,
 		req.UserID, req.PlanID, req.IPAddress, req.MACAddress, req.BillingDay, nextDue, graceDays,
+		req.PPPoEUsername, req.PPPoEPassword,
 	).Scan(&subID)
 	if err != nil {
 		return nil, fmt.Errorf("create subscription: %w", err)
@@ -287,4 +291,14 @@ func (r *SubscriptionRepo) GetDueSoon(ctx context.Context, days int) ([]*model.S
 		subs = append(subs, s)
 	}
 	return subs, rows.Err()
+}
+
+func (r *SubscriptionRepo) UpdatePPPoECredentials(ctx context.Context, id uuid.UUID, username, password *string) error {
+	_, err := r.db.Exec(ctx,
+		`UPDATE subscriptions SET pppoe_username = $1, pppoe_password = $2, updated_at = NOW() WHERE id = $3`,
+		username, password, id)
+	if err != nil {
+		return fmt.Errorf("update pppoe credentials: %w", err)
+	}
+	return nil
 }
