@@ -188,7 +188,7 @@ func (h *MikroTikHandler) CreatePPPoESecret(w http.ResponseWriter, r *http.Reque
 		writeError(w, http.StatusServiceUnavailable, "MikroTik not connected")
 		return
 	}
-	if err := mt.AddPPPoESecret(req.Username, req.Password, profile); err != nil {
+	if err := mt.AddPPPoESecret(req.Username, req.Password, profile, req.Comment); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to create PPPoE secret: "+err.Error())
 		return
 	}

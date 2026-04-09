@@ -168,20 +168,24 @@ func (c *Client) SpeedString(mbps int) string {
 }
 
 // AddPPPoESecret creates a PPPoE secret in /ppp/secret.
-func (c *Client) AddPPPoESecret(username, password, profile string) error {
+func (c *Client) AddPPPoESecret(username, password, profile, comment string) error {
 	client, err := c.connect()
 	if err != nil {
 		return err
 	}
 	defer client.Close()
 
-	_, err = client.Run(
+	args := []string{
 		"/ppp/secret/add",
-		"=name="+username,
-		"=password="+password,
-		"=profile="+profile,
+		"=name=" + username,
+		"=password=" + password,
+		"=profile=" + profile,
 		"=service=pppoe",
-	)
+	}
+	if comment != "" {
+		args = append(args, "=comment="+comment)
+	}
+	_, err = client.Run(args...)
 	if err != nil {
 		return fmt.Errorf("add pppoe secret %q: %w", username, err)
 	}

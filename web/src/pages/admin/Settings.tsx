@@ -238,10 +238,16 @@ export default function Settings() {
     setTestingMik(true);
     setMikStatus({ connected: false, tested: false, message: '' });
     try {
-      const res = await api.post<{ connected: boolean; message: string }>('/mikrotik/test', {});
+      const res = await api.post<{ connected: boolean; message: string }>('/mikrotik/test', {
+        host: settings.mikrotik_host ?? '',
+        port: parseInt(settings.mikrotik_port ?? '8728', 10) || 8728,
+        username: settings.mikrotik_user ?? '',
+        password: settings.mikrotik_password === '••••••' ? '' : (settings.mikrotik_password ?? ''),
+      });
       setMikStatus({ connected: res.data.connected, tested: true, message: res.data.message ?? '' });
-    } catch {
-      setMikStatus({ connected: false, tested: true, message: 'Connection test failed' });
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Connection test failed';
+      setMikStatus({ connected: false, tested: true, message: msg });
     } finally {
       setTestingMik(false);
     }
@@ -256,7 +262,12 @@ export default function Settings() {
     }
     setConnectingMik(true);
     try {
-      const res = await api.post<{ connected: boolean; message: string }>('/mikrotik/connect', {});
+      const res = await api.post<{ connected: boolean; message: string }>('/mikrotik/connect', {
+        host: settings.mikrotik_host ?? '',
+        port: parseInt(settings.mikrotik_port ?? '8728', 10) || 8728,
+        username: settings.mikrotik_user ?? '',
+        password: settings.mikrotik_password === '••••••' ? '' : (settings.mikrotik_password ?? ''),
+      });
       setMikStatus({ connected: res.data.connected, tested: true, message: res.data.message ?? '' });
       if (res.data.connected) {
         toast.success(res.data.message || 'Connected successfully');

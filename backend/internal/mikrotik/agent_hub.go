@@ -149,10 +149,14 @@ func (h *AgentHub) execute(op string, params map[string]string) ([]map[string]st
 	}
 }
 
-func (h *AgentHub) AddPPPoESecret(username, password, profile string) error {
-	_, err := h.execute("pppoe_add", map[string]string{
+func (h *AgentHub) AddPPPoESecret(username, password, profile, comment string) error {
+	params := map[string]string{
 		"username": username, "password": password, "profile": profile,
-	})
+	}
+	if comment != "" {
+		params["comment"] = comment
+	}
+	_, err := h.execute("pppoe_add", params)
 	return err
 }
 

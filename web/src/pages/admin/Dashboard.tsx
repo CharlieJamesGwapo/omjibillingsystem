@@ -40,7 +40,7 @@ function LoadingSkeleton() {
         <SkeletonBlock className="h-4 w-72 rounded-lg mt-2" />
       </div>
       {/* Stat cards */}
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4 animate-in animate-in-1">
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
         {[...Array(6)].map((_, i) => (
           <div key={i} className="stat-card">
             <SkeletonBlock className="h-9 w-9 rounded-lg mb-3" />
@@ -50,7 +50,7 @@ function LoadingSkeleton() {
         ))}
       </div>
       {/* Charts row */}
-      <div className="flex flex-col lg:flex-row gap-6 animate-in animate-in-2">
+      <div className="flex flex-col lg:flex-row gap-6">
         <div className="glass-card p-6" style={{ flex: '3 1 0%' }}>
           <SkeletonBlock className="h-5 w-40 mb-6" />
           <SkeletonBlock className="h-56 w-full rounded-lg" />
@@ -61,7 +61,7 @@ function LoadingSkeleton() {
         </div>
       </div>
       {/* Bottom row */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-in animate-in-3">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {[...Array(2)].map((_, i) => (
           <div key={i} className="glass-card p-6">
             <SkeletonBlock className="h-5 w-40 mb-6" />
@@ -326,7 +326,7 @@ export default function Dashboard() {
     <div className="space-y-8">
 
       {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 animate-in">
+      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
         <div>
           <h1 className="page-header">Dashboard</h1>
           <p className="page-subtitle">Welcome back. Here's what's happening today.</p>
@@ -338,7 +338,7 @@ export default function Dashboard() {
       </div>
 
       {/* ── Stat Cards Row ── */}
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4 animate-in animate-in-1">
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
         {cards.map((card) => (
           <div
             key={card.label}
@@ -367,7 +367,7 @@ export default function Dashboard() {
       </div>
 
       {/* ── Charts Row ── */}
-      <div className="flex flex-col lg:flex-row gap-6 animate-in animate-in-2">
+      <div className="flex flex-col lg:flex-row gap-6">
 
         {/* Revenue Trend (60%) */}
         <div className="glass-card p-6 bg-[#0d1526]" style={{ flex: '3 1 0%', minHeight: '280px' }}>
@@ -467,7 +467,7 @@ export default function Dashboard() {
       </div>
 
       {/* ── Bottom Row ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-in animate-in-3">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
         {/* Recent Activity */}
         <div className="glass-card p-6">

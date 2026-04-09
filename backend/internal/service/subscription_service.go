@@ -86,7 +86,7 @@ func (s *SubscriptionService) Create(ctx context.Context, req *model.CreateSubsc
 					password = *req.PPPoEPassword
 				}
 				profile := planProfile(plan)
-				if err := mt.AddPPPoESecret(*req.PPPoEUsername, password, profile); err != nil {
+				if err := mt.AddPPPoESecret(*req.PPPoEUsername, password, profile, ""); err != nil {
 					log.Printf("[MikroTik] AddPPPoESecret failed for %s: %v", *req.PPPoEUsername, err)
 				}
 			}

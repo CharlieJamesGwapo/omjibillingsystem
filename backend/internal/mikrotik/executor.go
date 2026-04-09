@@ -15,7 +15,7 @@ type MikroTikExecutor interface {
 	IsConnected() bool
 
 	// PPPoE secrets management
-	AddPPPoESecret(username, password, profile string) error
+	AddPPPoESecret(username, password, profile, comment string) error
 	DisablePPPoEUser(username string) error
 	EnablePPPoEUser(username string) error
 	SetPPPoEProfile(username, profile string) error
