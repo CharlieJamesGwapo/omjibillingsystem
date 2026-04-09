@@ -21,11 +21,11 @@ func NewPlanRepo(db *pgxpool.Pool) *PlanRepo {
 func (r *PlanRepo) Create(ctx context.Context, req *model.CreatePlanRequest) (*model.Plan, error) {
 	p := &model.Plan{}
 	err := r.db.QueryRow(ctx, `
-		INSERT INTO plans (name, speed_mbps, price, description, is_active)
-		VALUES ($1, $2, $3, $4, $5)
-		RETURNING id, name, speed_mbps, price, description, is_active, created_at`,
-		req.Name, req.SpeedMbps, req.Price, req.Description, req.IsActive,
-	).Scan(&p.ID, &p.Name, &p.SpeedMbps, &p.Price, &p.Description, &p.IsActive, &p.CreatedAt)
+		INSERT INTO plans (name, speed_mbps, price, description, is_active, mikrotik_profile)
+		VALUES ($1, $2, $3, $4, $5, $6)
+		RETURNING id, name, speed_mbps, price, description, is_active, mikrotik_profile, created_at`,
+		req.Name, req.SpeedMbps, req.Price, req.Description, req.IsActive, req.MikroTikProfile,
+	).Scan(&p.ID, &p.Name, &p.SpeedMbps, &p.Price, &p.Description, &p.IsActive, &p.MikroTikProfile, &p.CreatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("create plan: %w", err)
 	}
@@ -35,9 +35,9 @@ func (r *PlanRepo) Create(ctx context.Context, req *model.CreatePlanRequest) (*m
 func (r *PlanRepo) GetByID(ctx context.Context, id uuid.UUID) (*model.Plan, error) {
 	p := &model.Plan{}
 	err := r.db.QueryRow(ctx, `
-		SELECT id, name, speed_mbps, price, description, is_active, created_at
+		SELECT id, name, speed_mbps, price, description, is_active, mikrotik_profile, created_at
 		FROM plans WHERE id = $1`, id,
-	).Scan(&p.ID, &p.Name, &p.SpeedMbps, &p.Price, &p.Description, &p.IsActive, &p.CreatedAt)
+	).Scan(&p.ID, &p.Name, &p.SpeedMbps, &p.Price, &p.Description, &p.IsActive, &p.MikroTikProfile, &p.CreatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get plan by id: %w", err)
 	}
@@ -47,9 +47,9 @@ func (r *PlanRepo) GetByID(ctx context.Context, id uuid.UUID) (*model.Plan, erro
 func (r *PlanRepo) GetByName(ctx context.Context, name string) (*model.Plan, error) {
 	p := &model.Plan{}
 	err := r.db.QueryRow(ctx, `
-		SELECT id, name, speed_mbps, price, description, is_active, created_at
+		SELECT id, name, speed_mbps, price, description, is_active, mikrotik_profile, created_at
 		FROM plans WHERE name = $1`, name,
-	).Scan(&p.ID, &p.Name, &p.SpeedMbps, &p.Price, &p.Description, &p.IsActive, &p.CreatedAt)
+	).Scan(&p.ID, &p.Name, &p.SpeedMbps, &p.Price, &p.Description, &p.IsActive, &p.MikroTikProfile, &p.CreatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get plan by name: %w", err)
 	}
@@ -57,7 +57,7 @@ func (r *PlanRepo) GetByName(ctx context.Context, name string) (*model.Plan, err
 }
 
 func (r *PlanRepo) List(ctx context.Context, activeOnly bool) ([]*model.Plan, error) {
-	query := `SELECT id, name, speed_mbps, price, description, is_active, created_at FROM plans`
+	query := `SELECT id, name, speed_mbps, price, description, is_active, mikrotik_profile, created_at FROM plans`
 	if activeOnly {
 		query += ` WHERE is_active = true`
 	}
@@ -72,7 +72,7 @@ func (r *PlanRepo) List(ctx context.Context, activeOnly bool) ([]*model.Plan, er
 	var plans []*model.Plan
 	for rows.Next() {
 		p := &model.Plan{}
-		if err := rows.Scan(&p.ID, &p.Name, &p.SpeedMbps, &p.Price, &p.Description, &p.IsActive, &p.CreatedAt); err != nil {
+		if err := rows.Scan(&p.ID, &p.Name, &p.SpeedMbps, &p.Price, &p.Description, &p.IsActive, &p.MikroTikProfile, &p.CreatedAt); err != nil {
 			return nil, fmt.Errorf("scan plan: %w", err)
 		}
 		plans = append(plans, p)
@@ -110,6 +110,11 @@ func (r *PlanRepo) Update(ctx context.Context, id uuid.UUID, req *model.UpdatePl
 		args = append(args, *req.IsActive)
 		argIdx++
 	}
+	if req.MikroTikProfile != nil {
+		setClauses = append(setClauses, fmt.Sprintf("mikrotik_profile = $%d", argIdx))
+		args = append(args, *req.MikroTikProfile)
+		argIdx++
+	}
 
 	if len(setClauses) == 0 {
 		return r.GetByID(ctx, id)
@@ -117,12 +122,12 @@ func (r *PlanRepo) Update(ctx context.Context, id uuid.UUID, req *model.UpdatePl
 
 	args = append(args, id)
 	query := fmt.Sprintf(`UPDATE plans SET %s WHERE id = $%d
-		RETURNING id, name, speed_mbps, price, description, is_active, created_at`,
+		RETURNING id, name, speed_mbps, price, description, is_active, mikrotik_profile, created_at`,
 		strings.Join(setClauses, ", "), argIdx)
 
 	p := &model.Plan{}
 	err := r.db.QueryRow(ctx, query, args...).Scan(
-		&p.ID, &p.Name, &p.SpeedMbps, &p.Price, &p.Description, &p.IsActive, &p.CreatedAt,
+		&p.ID, &p.Name, &p.SpeedMbps, &p.Price, &p.Description, &p.IsActive, &p.MikroTikProfile, &p.CreatedAt,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("update plan: %w", err)
