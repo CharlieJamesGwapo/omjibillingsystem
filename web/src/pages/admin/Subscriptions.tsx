@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { parseISO, isPast } from 'date-fns';
 import api from '../../lib/api';
@@ -63,6 +64,7 @@ function isDateInPast(dateStr: string | null): boolean {
 }
 
 export default function Subscriptions() {
+  const [searchParams] = useSearchParams();
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [plans, setPlans] = useState<Plan[]>([]);
@@ -75,7 +77,8 @@ export default function Subscriptions() {
   const [submitting, setSubmitting] = useState(false);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [filter, setFilter] = useState<'all' | SubStatus>('all');
+  const initialStatus = searchParams.get('status') as SubStatus | null;
+  const [filter, setFilter] = useState<'all' | SubStatus>(initialStatus ?? 'all');
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
 

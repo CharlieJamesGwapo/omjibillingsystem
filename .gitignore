@@ -7,3 +7,4 @@ backend/package-lock.json
 agent/mikrotik-agent
 agent/billingsystem-agent
 .env
+.vercel

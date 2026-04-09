@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import api from '../../lib/api'
 import { formatCurrency, formatDate } from '../../lib/utils'
 import { toast } from 'sonner'
@@ -195,9 +196,11 @@ function ConfirmModal({ action, payment, onConfirm, onCancel, loading }: Confirm
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function Payments() {
+  const [searchParams] = useSearchParams()
   const [payments, setPayments] = useState<Payment[]>([])
   const [loading, setLoading] = useState(true)
-  const [filter, setFilter] = useState<'all' | PaymentStatus>('all')
+  const initialStatus = searchParams.get('status') as PaymentStatus | null
+  const [filter, setFilter] = useState<'all' | PaymentStatus>(initialStatus ?? 'all')
   const [actionLoading, setActionLoading] = useState(false)
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
