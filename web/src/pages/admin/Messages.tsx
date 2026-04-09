@@ -564,12 +564,12 @@ export default function Messages() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-2 flex-wrap">
+      <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none no-scrollbar [-webkit-overflow-scrolling:touch]">
         {tabs.map((t) => (
           <button
             key={t.value}
             onClick={() => setTab(t.value)}
-            className="flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition-all duration-200 cursor-pointer"
+            className="flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition-all duration-200 cursor-pointer shrink-0"
             style={
               tab === t.value
                 ? {
@@ -599,7 +599,7 @@ export default function Messages() {
       {tab === 'send' && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* ─── Left: Compose (2/3 width on desktop) ─── */}
-          <div className="lg:col-span-2 glass-card p-6">
+          <div className="lg:col-span-2 glass-card p-6 overflow-visible">
             <h2
               className="font-heading text-base font-bold text-text-primary mb-4 tracking-wide"
               style={{ fontFamily: "'Rajdhani', sans-serif" }}
@@ -675,7 +675,7 @@ export default function Messages() {
                       />
                       {showDropdown && searchResults.length > 0 && (
                         <div
-                          className="absolute z-20 w-full mt-1 rounded-lg overflow-hidden shadow-xl max-h-56 overflow-y-auto"
+                          className="absolute z-30 left-0 right-0 mt-1 rounded-lg overflow-hidden shadow-xl max-h-56 overflow-y-auto"
                           style={{ background: '#0f1a2e', border: '1px solid rgba(34,211,238,0.1)' }}
                         >
                           {searchResults.map((c) => (
@@ -720,7 +720,7 @@ export default function Messages() {
                 <div>
                   <label className="form-label">Message</label>
                   <textarea
-                    className="form-input"
+                    className="form-input min-h-[100px]"
                     rows={4}
                     value={message}
                     onChange={(e) => setMessage(e.target.value.slice(0, 160))}
@@ -786,7 +786,7 @@ export default function Messages() {
                 <div>
                   <label className="form-label">Message</label>
                   <textarea
-                    className="form-input"
+                    className="form-input min-h-[100px]"
                     rows={4}
                     value={message}
                     onChange={(e) => setMessage(e.target.value)}
@@ -1258,14 +1258,9 @@ export default function Messages() {
                 ) : (
                   filteredHistory.map((msg) => (
                     <div key={msg.id} className="glass-card p-4">
-                      <div className="flex items-start justify-between mb-2">
-                        <div>
-                          <p className="font-semibold text-[#f1f5f9] text-sm">{msg.recipient_name}</p>
-                          <p className="text-xs text-[#64748b]">{msg.recipient_phone}</p>
-                        </div>
+                      {/* Card header: badges + timestamp */}
+                      <div className="flex items-center gap-2 flex-wrap mb-2">
                         <StatusBadge status={msg.status} />
-                      </div>
-                      <div className="flex items-center gap-2 mb-2">
                         <TypeBadge type={msg.type} />
                         {msg.batch_id && (
                           <span
@@ -1275,24 +1270,30 @@ export default function Messages() {
                             {msg.batch_id.slice(0, 8)}
                           </span>
                         )}
+                        <span className="text-xs text-[#475569] ml-auto shrink-0">
+                          {formatDate(msg.created_at)}
+                        </span>
                       </div>
+                      {/* Recipient */}
+                      <p className="font-semibold text-[#f1f5f9] text-sm leading-tight">{msg.recipient_name}</p>
+                      <p className="font-mono text-xs text-[#64748b] mb-1">{msg.recipient_phone}</p>
+                      {/* Message preview */}
                       <p
-                        className="text-sm text-[#94a3b8] cursor-pointer"
+                        className="text-sm text-[#94a3b8] cursor-pointer leading-snug line-clamp-2"
                         onClick={() => setExpandedMsg(expandedMsg === msg.id ? null : msg.id)}
                       >
                         {expandedMsg === msg.id
                           ? msg.message
-                          : msg.message.length > 80
-                            ? msg.message.slice(0, 80) + '...'
+                          : msg.message.length > 60
+                            ? msg.message.slice(0, 60) + '...'
                             : msg.message}
                       </p>
-                      <p className="text-xs text-[#475569] mt-2">{formatDate(msg.created_at)}</p>
                     </div>
                   ))
                 )}
 
                 {totalPages > 1 && (
-                  <div className="flex gap-2 justify-center pt-2">
+                  <div className="flex items-center justify-between gap-2 pt-2">
                     <button
                       onClick={() => {
                         const p = historyPage - 1;
@@ -1300,12 +1301,15 @@ export default function Messages() {
                         fetchHistory(p);
                       }}
                       disabled={historyPage <= 1}
-                      className="btn-outline disabled:opacity-40 min-h-[44px]"
+                      className="btn-outline disabled:opacity-40 min-h-[44px] !px-4"
                     >
-                      Previous
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
+                      </svg>
+                      <span className="ml-1 hidden xs:inline">Prev</span>
                     </button>
-                    <span className="flex items-center text-xs text-[#64748b] px-2">
-                      {historyPage}/{totalPages}
+                    <span className="text-xs text-[#64748b] font-medium whitespace-nowrap">
+                      Page {historyPage} of {totalPages}
                     </span>
                     <button
                       onClick={() => {
@@ -1314,9 +1318,12 @@ export default function Messages() {
                         fetchHistory(p);
                       }}
                       disabled={historyPage >= totalPages}
-                      className="btn-outline disabled:opacity-40 min-h-[44px]"
+                      className="btn-outline disabled:opacity-40 min-h-[44px] !px-4"
                     >
-                      Next
+                      <span className="mr-1 hidden xs:inline">Next</span>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+                      </svg>
                     </button>
                   </div>
                 )}
@@ -1349,7 +1356,7 @@ export default function Messages() {
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {templates.map((t) => {
                 const vars = parseVariables(t.variables);
                 return (

@@ -235,82 +235,82 @@ export default function ActivityLogs() {
       </div>
 
       {/* Filters */}
-      <div className="glass-card p-4 flex flex-wrap gap-3 items-center animate-in animate-in-2">
-        {/* Search */}
-        <div className="relative flex-1 min-w-48">
-          <svg
-            className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4"
-            style={{ color: '#475569' }}
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2}
+      <div className="glass-card p-4 space-y-3 animate-in animate-in-2">
+        {/* Row 1: Search + Action filter */}
+        <div className="flex gap-3">
+          <div className="relative flex-1">
+            <svg
+              className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4"
+              style={{ color: '#475569' }}
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            <input
+              type="text"
+              placeholder="Search action, target, user…"
+              value={search}
+              onChange={(e) => handleSearch(e.target.value)}
+              className="input-field pl-9 w-full"
+            />
+          </div>
+          <select
+            value={actionFilter}
+            onChange={(e) => setActionFilter(e.target.value)}
+            className="input-field w-36 flex-shrink-0"
           >
-            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
-          <input
-            type="text"
-            placeholder="Search action, target, user…"
-            value={search}
-            onChange={(e) => handleSearch(e.target.value)}
-            className="input-field pl-9 w-full"
-          />
+            <option value="all">All Actions</option>
+            {uniqueActions.map((a) => (
+              <option key={a} value={a}>
+                {prettyAction(a)}
+              </option>
+            ))}
+          </select>
         </div>
 
-        {/* Action filter */}
-        <select
-          value={actionFilter}
-          onChange={(e) => setActionFilter(e.target.value)}
-          className="input-field min-w-36"
-        >
-          <option value="all">All Actions</option>
-          {uniqueActions.map((a) => (
-            <option key={a} value={a}>
-              {prettyAction(a)}
-            </option>
-          ))}
-        </select>
-
-        {/* Date range */}
-        <div className="flex items-center gap-2">
-          <span className="text-xs" style={{ color: '#475569' }}>From</span>
-          <input
-            type="date"
-            value={dateFrom}
-            onChange={(e) => setDateFrom(e.target.value)}
-            className="input-field"
-          />
+        {/* Row 2: Date range + Clear */}
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-2">
+            <span className="text-xs" style={{ color: '#475569' }}>From</span>
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              className="input-field text-sm"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs" style={{ color: '#475569' }}>To</span>
+            <input
+              type="date"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+              className="input-field text-sm"
+            />
+          </div>
+          {(search || actionFilter !== 'all' || dateFrom || dateTo) && (
+            <button
+              onClick={() => {
+                setSearch('')
+                setDebouncedSearch('')
+                setActionFilter('all')
+                setDateFrom('')
+                setDateTo('')
+              }}
+              className="text-xs px-3 py-1.5 rounded-lg transition-colors"
+              style={{ background: 'rgba(255,255,255,0.06)', color: '#94a3b8' }}
+            >
+              Clear
+            </button>
+          )}
         </div>
-        <div className="flex items-center gap-2">
-          <span className="text-xs" style={{ color: '#475569' }}>To</span>
-          <input
-            type="date"
-            value={dateTo}
-            onChange={(e) => setDateTo(e.target.value)}
-            className="input-field"
-          />
-        </div>
-
-        {/* Clear filters */}
-        {(search || actionFilter !== 'all' || dateFrom || dateTo) && (
-          <button
-            onClick={() => {
-              setSearch('')
-              setDebouncedSearch('')
-              setActionFilter('all')
-              setDateFrom('')
-              setDateTo('')
-            }}
-            className="text-xs px-3 py-1.5 rounded-lg transition-colors"
-            style={{ background: 'rgba(255,255,255,0.06)', color: '#94a3b8' }}
-          >
-            Clear
-          </button>
-        )}
       </div>
 
-      {/* Table */}
-      <div className="glass-card overflow-hidden animate-in animate-in-3">
+      {/* Table — desktop only */}
+      <div className="hidden md:block glass-card overflow-hidden animate-in animate-in-3">
         <div className="overflow-x-auto">
           <table className="data-table">
             <thead>
@@ -474,17 +474,93 @@ export default function ActivityLogs() {
         </div>
       </div>
 
+      {/* Mobile log cards */}
+      <div className="md:hidden space-y-2 animate-in animate-in-3">
+        {loading ? (
+          [...Array(5)].map((_, i) => (
+            <div key={i} className="glass-card p-4 animate-pulse">
+              <div className="h-3 w-32 rounded bg-white/5 mb-2" />
+              <div className="h-3 w-full rounded bg-white/5 mb-1" />
+              <div className="h-3 w-24 rounded bg-white/5" />
+            </div>
+          ))
+        ) : filteredLogs.length === 0 ? (
+          <div className="glass-card p-8 text-center">
+            <p className="text-text-secondary text-sm">No activity logs found</p>
+          </div>
+        ) : (
+          filteredLogs.map((log) => {
+            const isExpanded = expandedRows.has(log.id)
+            const hasDetails = Object.keys(log.details ?? {}).length > 0
+            const dotColor = actionDotColor(log.action)
+
+            return (
+              <div key={log.id} className="glass-card p-4">
+                {/* Top row: color dot + action + time */}
+                <div className="flex items-start justify-between gap-2 mb-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="w-2 h-2 rounded-full flex-shrink-0 mt-0.5" style={{ background: dotColor }} />
+                    <span className="text-sm font-semibold truncate" style={{ color: dotColor }}>
+                      {prettyAction(log.action)}
+                    </span>
+                  </div>
+                  <span className="text-xs text-text-secondary/60 whitespace-nowrap flex-shrink-0 tabular-nums" style={{ color: '#64748b' }}>
+                    {formatDateTime(log.created_at)}
+                  </span>
+                </div>
+
+                {/* Meta row: actor → target */}
+                <div className="flex items-center gap-1.5 text-xs flex-wrap" style={{ color: '#94a3b8' }}>
+                  <span className="font-semibold" style={{ color: '#e2e8f0' }}>{log.user_name ?? 'Unknown'}</span>
+                  <span>→</span>
+                  <span>{prettyAction(log.target_type)}</span>
+                  {log.target_id && (
+                    <span className="font-mono text-[11px]" style={{ color: 'rgba(100,116,139,0.5)' }}>#{log.target_id.slice(0, 8)}</span>
+                  )}
+                </div>
+
+                {/* IP */}
+                {log.ip_address && (
+                  <p className="text-[11px] font-mono mt-1" style={{ color: 'rgba(100,116,139,0.4)' }}>{log.ip_address}</p>
+                )}
+
+                {/* Expand details */}
+                {hasDetails && (
+                  <button
+                    onClick={() => toggleExpand(log.id)}
+                    className="mt-2 text-xs flex items-center gap-1 transition-colors"
+                    style={{ color: 'rgba(6,182,212,0.7)' }}
+                  >
+                    <svg className={`w-3 h-3 transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                    </svg>
+                    {isExpanded ? 'Hide details' : 'Show details'}
+                  </button>
+                )}
+
+                {isExpanded && hasDetails && (
+                  <div className="mt-2 rounded-lg overflow-hidden border" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
+                    <ColoredJSON data={log.details} />
+                  </div>
+                )}
+              </div>
+            )
+          })
+        )}
+      </div>
+
       {/* Pagination */}
       {total > 0 && (
-        <div className="flex items-center justify-between mt-6">
+        <div className="flex items-center justify-between mt-4 gap-4">
           <p
-            className="text-sm"
+            className="text-xs sm:text-sm"
             style={{ color: '#64748b', fontFamily: "'Outfit', sans-serif" }}
           >
-            Showing {Math.min((page - 1) * LIMIT + 1, total)}–{Math.min(page * LIMIT, total)} of{' '}
-            {total}
+            <span className="hidden sm:inline">Showing </span>
+            {Math.min((page - 1) * LIMIT + 1, total)}–{Math.min(page * LIMIT, total)}
+            <span> of {total}</span>
             {filteredLogs.length < Math.min(LIMIT, total) && (
-              <span className="ml-1">
+              <span className="ml-1 hidden sm:inline">
                 ({filteredLogs.length} visible after filters)
               </span>
             )}
@@ -493,22 +569,22 @@ export default function ActivityLogs() {
             <button
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={page <= 1}
-              className="btn-outline disabled:opacity-30"
+              className="btn-outline disabled:opacity-30 !py-1.5 !px-3 text-sm"
             >
-              Previous
+              ←
             </button>
             <span
-              className="text-sm px-2"
+              className="text-sm"
               style={{ color: '#94a3b8', fontFamily: "'Outfit', sans-serif" }}
             >
-              {page} / {totalPages || 1}
+              {page}/{totalPages || 1}
             </span>
             <button
-              onClick={() => setPage((p) => p + 1)}
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               disabled={page >= totalPages}
-              className="btn-outline disabled:opacity-30"
+              className="btn-outline disabled:opacity-30 !py-1.5 !px-3 text-sm"
             >
-              Next
+              →
             </button>
           </div>
         </div>
