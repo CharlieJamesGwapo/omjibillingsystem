@@ -1,5 +1,8 @@
 import { useState, useEffect } from 'react';
+import { toast } from 'sonner';
+import { parseISO, isPast } from 'date-fns';
 import api from '../../lib/api';
+import { formatCurrency, formatDate } from '../../lib/utils';
 import type { Subscription, User, Plan, SubStatus } from '../../lib/types';
 
 interface SubForm {
@@ -8,8 +11,15 @@ interface SubForm {
   ip_address: string;
   mac_address: string;
   billing_day: string;
-  pppoe_username?: string;
-  pppoe_password?: string;
+  pppoe_username: string;
+  pppoe_password: string;
+}
+
+interface FormErrors {
+  user_id?: string;
+  plan_id?: string;
+  billing_day?: string;
+  pppoe?: string;
 }
 
 const emptyForm: SubForm = {
@@ -18,11 +28,39 @@ const emptyForm: SubForm = {
   ip_address: '',
   mac_address: '',
   billing_day: '1',
-  pppoe_username: undefined,
-  pppoe_password: undefined,
+  pppoe_username: '',
+  pppoe_password: '',
 };
 
 const LIMIT = 20;
+
+// Spinner component
+function Spinner({ className = 'w-4 h-4' }: { className?: string }) {
+  return (
+    <svg
+      className={`animate-spin ${className}`}
+      xmlns="http://www.w3.org/2000/svg"
+      fill="none"
+      viewBox="0 0 24 24"
+    >
+      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+      <path
+        className="opacity-75"
+        fill="currentColor"
+        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+      />
+    </svg>
+  );
+}
+
+function isDateInPast(dateStr: string | null): boolean {
+  if (!dateStr) return false;
+  try {
+    return isPast(parseISO(dateStr));
+  } catch {
+    return false;
+  }
+}
 
 export default function Subscriptions() {
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
@@ -33,12 +71,22 @@ export default function Subscriptions() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<SubForm>(emptyForm);
+  const [formErrors, setFormErrors] = useState<FormErrors>({});
   const [submitting, setSubmitting] = useState(false);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [filter, setFilter] = useState<'all' | SubStatus>('all');
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
+
+  // Disconnect confirmation modal state
+  const [disconnectTarget, setDisconnectTarget] = useState<Subscription | null>(null);
+  const [disconnecting, setDisconnecting] = useState(false);
+
+  // Per-row reconnect loading
+  const [reconnectingId, setReconnectingId] = useState<string | null>(null);
+  // Per-row disconnect loading (for the confirmation modal action)
+  const [disconnectingId, setDisconnectingId] = useState<string | null>(null);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -77,6 +125,7 @@ export default function Subscriptions() {
   useEffect(() => {
     setLoading(true);
     fetchData();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, debouncedSearch, filter]);
 
   const handleFilterChange = (value: 'all' | SubStatus) => {
@@ -84,17 +133,24 @@ export default function Subscriptions() {
     setPage(1);
   };
 
-  const formatCurrency = (amount: number) =>
-    `₱${amount.toLocaleString('en-PH', { minimumFractionDigits: 2 })}`;
+  const validateForm = (): FormErrors => {
+    const errors: FormErrors = {};
+    if (!form.user_id) errors.user_id = 'Customer is required';
+    if (!form.plan_id) errors.plan_id = 'Plan is required';
 
-  const formatDate = (date: string) =>
-    date
-      ? new Date(date).toLocaleDateString('en-PH', {
-          year: 'numeric',
-          month: 'short',
-          day: 'numeric',
-        })
-      : '-';
+    const billingDay = Number(form.billing_day);
+    if (!form.billing_day || isNaN(billingDay) || !Number.isInteger(billingDay) || billingDay < 1 || billingDay > 28) {
+      errors.billing_day = 'Billing day must be a whole number between 1 and 28';
+    }
+
+    const hasUsername = form.pppoe_username.trim() !== '';
+    const hasPassword = form.pppoe_password.trim() !== '';
+    if (hasUsername !== hasPassword) {
+      errors.pppoe = 'Both PPPoE username and password must be filled, or both left blank';
+    }
+
+    return errors;
+  };
 
   const statusBadge = (status: SubStatus) => {
     const cls: Record<string, string> = {
@@ -107,6 +163,7 @@ export default function Subscriptions() {
 
   const openAdd = () => {
     setForm(emptyForm);
+    setFormErrors({});
     setEditingId(null);
     setModalOpen(true);
   };
@@ -118,15 +175,22 @@ export default function Subscriptions() {
       ip_address: sub.ip_address || '',
       mac_address: sub.mac_address || '',
       billing_day: String(sub.billing_day),
-      pppoe_username: sub.pppoe_username || undefined,
-      pppoe_password: sub.pppoe_password || undefined,
+      pppoe_username: sub.pppoe_username || '',
+      pppoe_password: sub.pppoe_password || '',
     });
+    setFormErrors({});
     setEditingId(sub.id);
     setModalOpen(true);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const errors = validateForm();
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      return;
+    }
+    setFormErrors({});
     setSubmitting(true);
     try {
       const body = {
@@ -140,37 +204,58 @@ export default function Subscriptions() {
       };
       if (editingId) {
         await api.put(`/subscriptions/${editingId}`, body);
+        toast.success('Subscription updated');
       } else {
         await api.post('/subscriptions', body);
+        toast.success('Subscription created');
       }
       setModalOpen(false);
       setLoading(true);
       await fetchData();
-    } catch {
-      setError(editingId ? 'Failed to update subscription' : 'Failed to add subscription');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : (editingId ? 'Failed to update subscription' : 'Failed to add subscription');
+      toast.error(msg);
+      setError(msg);
     } finally {
       setSubmitting(false);
     }
   };
 
-  const handleDisconnect = async (id: string) => {
-    if (!confirm('Disconnect this subscription?')) return;
+  const confirmDisconnect = (sub: Subscription) => {
+    setDisconnectTarget(sub);
+  };
+
+  const handleDisconnectConfirmed = async () => {
+    if (!disconnectTarget) return;
+    setDisconnecting(true);
+    setDisconnectingId(disconnectTarget.id);
     try {
-      await api.post(`/subscriptions/${id}/disconnect`);
+      await api.post(`/subscriptions/${disconnectTarget.id}/disconnect`);
+      toast.success('Client disconnected');
+      setDisconnectTarget(null);
       setLoading(true);
       await fetchData();
-    } catch {
-      setError('Failed to disconnect');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to disconnect';
+      toast.error(msg);
+    } finally {
+      setDisconnecting(false);
+      setDisconnectingId(null);
     }
   };
 
   const handleReconnect = async (id: string) => {
+    setReconnectingId(id);
     try {
       await api.post(`/subscriptions/${id}/reconnect`);
+      toast.success('Client reconnected');
       setLoading(true);
       await fetchData();
-    } catch {
-      setError('Failed to reconnect');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to reconnect';
+      toast.error(msg);
+    } finally {
+      setReconnectingId(null);
     }
   };
 
@@ -180,6 +265,23 @@ export default function Subscriptions() {
     { label: 'Overdue', value: 'overdue' as SubStatus },
     { label: 'Suspended', value: 'suspended' as SubStatus },
   ];
+
+  const DueDateCell = ({ sub }: { sub: Subscription }) => {
+    const isOverdue = sub.status === 'overdue' && isDateInPast(sub.next_due_date);
+    return (
+      <span className="flex items-center gap-1.5 flex-wrap">
+        <span style={{ fontSize: 13, color: '#64748b' }}>{formatDate(sub.next_due_date)}</span>
+        {isOverdue && (
+          <span
+            className="inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-bold tracking-wider"
+            style={{ background: 'rgba(239,68,68,0.15)', color: '#f87171' }}
+          >
+            OVERDUE
+          </span>
+        )}
+      </span>
+    );
+  };
 
   if (loading) {
     return (
@@ -321,7 +423,7 @@ export default function Subscriptions() {
                         {sub.billing_day}
                       </span>
                     </td>
-                    <td style={{ fontSize: 13, color: '#64748b' }}>{formatDate(sub.next_due_date)}</td>
+                    <td><DueDateCell sub={sub} /></td>
                     <td>
                       <div className="flex items-center gap-2">
                         <button
@@ -335,24 +437,34 @@ export default function Subscriptions() {
                         </button>
                         {sub.status === 'active' || sub.status === 'overdue' ? (
                           <button
-                            onClick={() => handleDisconnect(sub.id)}
-                            className="btn-danger !py-1.5 !px-3 !text-xs flex items-center gap-1.5"
+                            onClick={() => confirmDisconnect(sub)}
+                            disabled={disconnectingId === sub.id}
+                            className="btn-danger !py-1.5 !px-3 !text-xs flex items-center gap-1.5 disabled:opacity-60"
                             title="Disconnect"
                           >
-                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 0 0 5.636 5.636m12.728 12.728A9 9 0 0 1 5.636 5.636m12.728 12.728L5.636 5.636" />
-                            </svg>
+                            {disconnectingId === sub.id ? (
+                              <Spinner className="w-3.5 h-3.5" />
+                            ) : (
+                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 0 0 5.636 5.636m12.728 12.728A9 9 0 0 1 5.636 5.636m12.728 12.728L5.636 5.636" />
+                              </svg>
+                            )}
                             Disconnect
                           </button>
                         ) : (
                           <button
                             onClick={() => handleReconnect(sub.id)}
-                            className="btn-success !py-1.5 !px-3 !text-xs flex items-center gap-1.5"
+                            disabled={reconnectingId === sub.id}
+                            className="btn-success !py-1.5 !px-3 !text-xs flex items-center gap-1.5 disabled:opacity-60"
                             title="Reconnect"
                           >
-                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M8.288 15.038a5.25 5.25 0 0 1 7.424 0M5.106 11.856c3.807-3.808 9.98-3.808 13.788 0M1.924 8.674c5.565-5.565 14.587-5.565 20.152 0M12.53 18.22l-.53.53-.53-.53a.75.75 0 0 1 1.06 0Z" />
-                            </svg>
+                            {reconnectingId === sub.id ? (
+                              <Spinner className="w-3.5 h-3.5" />
+                            ) : (
+                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M8.288 15.038a5.25 5.25 0 0 1 7.424 0M5.106 11.856c3.807-3.808 9.98-3.808 13.788 0M1.924 8.674c5.565-5.565 14.587-5.565 20.152 0M12.53 18.22l-.53.53-.53-.53a.75.75 0 0 1 1.06 0Z" />
+                              </svg>
+                            )}
                             Reconnect
                           </button>
                         )}
@@ -424,7 +536,7 @@ export default function Subscriptions() {
                 </div>
                 <div className="col-span-2">
                   <p className="form-label !text-[10px] !mb-1">Due Date</p>
-                  <span style={{ fontSize: 13, color: '#64748b' }}>{formatDate(sub.next_due_date)}</span>
+                  <DueDateCell sub={sub} />
                 </div>
               </div>
 
@@ -441,22 +553,32 @@ export default function Subscriptions() {
                 </button>
                 {sub.status === 'active' || sub.status === 'overdue' ? (
                   <button
-                    onClick={() => handleDisconnect(sub.id)}
-                    className="btn-danger !py-2 !px-3 !text-xs flex items-center gap-1.5 flex-1"
+                    onClick={() => confirmDisconnect(sub)}
+                    disabled={disconnectingId === sub.id}
+                    className="btn-danger !py-2 !px-3 !text-xs flex items-center gap-1.5 flex-1 disabled:opacity-60"
                   >
-                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 0 0 5.636 5.636m12.728 12.728A9 9 0 0 1 5.636 5.636m12.728 12.728L5.636 5.636" />
-                    </svg>
+                    {disconnectingId === sub.id ? (
+                      <Spinner className="w-3.5 h-3.5" />
+                    ) : (
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 0 0 5.636 5.636m12.728 12.728A9 9 0 0 1 5.636 5.636m12.728 12.728L5.636 5.636" />
+                      </svg>
+                    )}
                     Disconnect
                   </button>
                 ) : (
                   <button
                     onClick={() => handleReconnect(sub.id)}
-                    className="btn-success !py-2 !px-3 !text-xs flex items-center gap-1.5 flex-1"
+                    disabled={reconnectingId === sub.id}
+                    className="btn-success !py-2 !px-3 !text-xs flex items-center gap-1.5 flex-1 disabled:opacity-60"
                   >
-                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M8.288 15.038a5.25 5.25 0 0 1 7.424 0M5.106 11.856c3.807-3.808 9.98-3.808 13.788 0M1.924 8.674c5.565-5.565 14.587-5.565 20.152 0M12.53 18.22l-.53.53-.53-.53a.75.75 0 0 1 1.06 0Z" />
-                    </svg>
+                    {reconnectingId === sub.id ? (
+                      <Spinner className="w-3.5 h-3.5" />
+                    ) : (
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M8.288 15.038a5.25 5.25 0 0 1 7.424 0M5.106 11.856c3.807-3.808 9.98-3.808 13.788 0M1.924 8.674c5.565-5.565 14.587-5.565 20.152 0M12.53 18.22l-.53.53-.53-.53a.75.75 0 0 1 1.06 0Z" />
+                      </svg>
+                    )}
                     Reconnect
                   </button>
                 )}
@@ -491,21 +613,66 @@ export default function Subscriptions() {
         </div>
       )}
 
-      {/* Modal */}
+      {/* Disconnect Confirmation Modal */}
+      {disconnectTarget && (
+        <div className="modal-overlay" onClick={() => !disconnecting && setDisconnectTarget(null)}>
+          <div className="modal-content !max-w-md" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-3 mb-4">
+              <div
+                className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
+                style={{ background: 'rgba(239,68,68,0.12)' }}
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} style={{ color: '#f87171' }}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 0 0 5.636 5.636m12.728 12.728A9 9 0 0 1 5.636 5.636m12.728 12.728L5.636 5.636" />
+                </svg>
+              </div>
+              <div>
+                <h2 className="page-header" style={{ fontSize: 18, marginBottom: 0 }}>
+                  Disconnect {disconnectTarget.user_name}?
+                </h2>
+              </div>
+            </div>
+            <p className="text-sm mb-6" style={{ color: '#94a3b8', fontFamily: "'Outfit', sans-serif" }}>
+              This will suspend their connection and disable their MikroTik access.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setDisconnectTarget(null)}
+                disabled={disconnecting}
+                className="btn-outline disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDisconnectConfirmed}
+                disabled={disconnecting}
+                className="btn-danger flex items-center gap-2 disabled:opacity-60"
+              >
+                {disconnecting && <Spinner className="w-4 h-4" />}
+                Disconnect
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Create / Edit Modal */}
       {modalOpen && (
-        <div className="modal-overlay" onClick={() => setModalOpen(false)}>
+        <div className="modal-overlay" onClick={() => !submitting && setModalOpen(false)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <h2 className="page-header mb-6" style={{ fontSize: 22 }}>
               {editingId ? 'Edit Subscription' : 'Add Subscription'}
             </h2>
-            <form onSubmit={handleSubmit} className="space-y-5">
+            <form onSubmit={handleSubmit} className="space-y-5" noValidate>
+              {/* Customer */}
               <div>
                 <label className="form-label">Customer *</label>
                 <select
-                  required
-                  value={form.user_id || ''}
+                  value={form.user_id}
                   onChange={(e) => setForm({ ...form, user_id: e.target.value })}
-                  className="form-input"
+                  className={`form-input${formErrors.user_id ? ' !border-red-500' : ''}`}
                 >
                   <option value="">Select customer</option>
                   {users.map((u) => (
@@ -514,14 +681,18 @@ export default function Subscriptions() {
                     </option>
                   ))}
                 </select>
+                {formErrors.user_id && (
+                  <p className="text-xs text-red-400 mt-1">{formErrors.user_id}</p>
+                )}
               </div>
+
+              {/* Plan */}
               <div>
                 <label className="form-label">Plan *</label>
                 <select
-                  required
-                  value={form.plan_id || ''}
+                  value={form.plan_id}
                   onChange={(e) => setForm({ ...form, plan_id: e.target.value })}
-                  className="form-input"
+                  className={`form-input${formErrors.plan_id ? ' !border-red-500' : ''}`}
                 >
                   <option value="">Select plan</option>
                   {plans.map((p) => (
@@ -530,7 +701,12 @@ export default function Subscriptions() {
                     </option>
                   ))}
                 </select>
+                {formErrors.plan_id && (
+                  <p className="text-xs text-red-400 mt-1">{formErrors.plan_id}</p>
+                )}
               </div>
+
+              {/* IP / MAC */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="form-label">IP Address</label>
@@ -553,6 +729,8 @@ export default function Subscriptions() {
                   />
                 </div>
               </div>
+
+              {/* PPPoE fields */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="form-label">
@@ -560,10 +738,10 @@ export default function Subscriptions() {
                   </label>
                   <input
                     type="text"
-                    value={form.pppoe_username ?? ''}
-                    onChange={(e) => setForm((f: SubForm) => ({ ...f, pppoe_username: e.target.value || undefined }))}
+                    value={form.pppoe_username}
+                    onChange={(e) => setForm({ ...form, pppoe_username: e.target.value })}
                     placeholder="e.g. client01"
-                    className="form-input"
+                    className={`form-input${formErrors.pppoe ? ' !border-amber-500' : ''}`}
                   />
                 </div>
                 <div>
@@ -572,30 +750,52 @@ export default function Subscriptions() {
                   </label>
                   <input
                     type="text"
-                    value={form.pppoe_password ?? ''}
-                    onChange={(e) => setForm((f: SubForm) => ({ ...f, pppoe_password: e.target.value || undefined }))}
+                    value={form.pppoe_password}
+                    onChange={(e) => setForm({ ...form, pppoe_password: e.target.value })}
                     placeholder="e.g. password123"
-                    className="form-input"
+                    className={`form-input${formErrors.pppoe ? ' !border-amber-500' : ''}`}
                   />
                 </div>
               </div>
+              {formErrors.pppoe && (
+                <p className="text-xs text-red-400 -mt-2">{formErrors.pppoe}</p>
+              )}
+              <p className="text-xs text-gray-500 mt-1">
+                Only fill PPPoE fields if the customer connects via PPPoE. Leave blank for IP-based queue management.
+              </p>
+
+              {/* Billing Day */}
               <div>
                 <label className="form-label">Billing Day (1-28) *</label>
                 <input
                   type="number"
-                  required
                   min={1}
                   max={28}
                   value={form.billing_day}
                   onChange={(e) => setForm({ ...form, billing_day: e.target.value })}
-                  className="form-input"
+                  className={`form-input${formErrors.billing_day ? ' !border-red-500' : ''}`}
                 />
+                {formErrors.billing_day && (
+                  <p className="text-xs text-red-400 mt-1">{formErrors.billing_day}</p>
+                )}
               </div>
+
+              {/* Actions */}
               <div className="flex justify-end gap-3 pt-4" style={{ borderTop: '1px solid rgba(34,211,238,0.06)' }}>
-                <button type="button" onClick={() => setModalOpen(false)} className="btn-outline">
+                <button
+                  type="button"
+                  onClick={() => setModalOpen(false)}
+                  disabled={submitting}
+                  className="btn-outline disabled:opacity-50"
+                >
                   Cancel
                 </button>
-                <button type="submit" disabled={submitting} className="btn-primary">
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="btn-primary flex items-center gap-2 disabled:opacity-60"
+                >
+                  {submitting && <Spinner className="w-4 h-4" />}
                   {submitting ? 'Saving...' : editingId ? 'Update' : 'Create'}
                 </button>
               </div>
