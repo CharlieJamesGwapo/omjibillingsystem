@@ -49,6 +49,7 @@ export default function Subscriptions() {
   }, [search]);
 
   const fetchData = async () => {
+    setError('');
     try {
       const params = new URLSearchParams({
         page: String(page),
@@ -59,12 +60,12 @@ export default function Subscriptions() {
 
       const [subsRes, usersRes, plansRes] = await Promise.all([
         api.get<{ data: Subscription[]; total: number; page: number; limit: number }>(`/subscriptions?${params}`),
-        api.get<User[]>('/users'),
+        api.get<{ data: User[]; total: number }>('/users?role=customer&limit=1000'),
         api.get<Plan[]>('/plans'),
       ]);
       setSubscriptions(subsRes.data.data ?? []);
       setTotal(subsRes.data.total ?? 0);
-      setUsers((usersRes.data ?? []).filter((u: User) => u.role === 'customer'));
+      setUsers(usersRes.data.data ?? []);
       setPlans(plansRes.data ?? []);
     } catch {
       setError('Failed to load data');
