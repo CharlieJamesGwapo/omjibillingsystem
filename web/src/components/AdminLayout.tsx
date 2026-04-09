@@ -193,9 +193,20 @@ export default function AdminLayout() {
   const [brandName, setBrandName] = useState('OMJI');
   const [brandLogo, setBrandLogo] = useState('');
   const [brandTagline, setBrandTagline] = useState('Billing System');
+  const [userFullName, setUserFullName] = useState('');
   const navigate = useNavigate();
   const location = useLocation();
   const user = getCurrentUser();
+
+  useEffect(() => {
+    api.get<{ id: string; full_name: string; role: string }>('/users/me')
+      .then(res => setUserFullName(res.data.full_name ?? ''))
+      .catch(() => {}) // non-fatal
+  }, []);
+
+  useEffect(() => {
+    setSidebarOpen(false);
+  }, [location.pathname]);
 
   useEffect(() => {
     api.get<Record<string, string>>('/settings').then(res => {
@@ -235,13 +246,8 @@ export default function AdminLayout() {
   const roleBadge = user?.role === 'admin' ? 'Admin' : 'Technician';
   const roleBadgeClass = user?.role === 'admin' ? 'badge-admin' : 'badge-technician';
 
-  const userInitials = user?.name
-    ? user.name
-        .split(' ')
-        .map((n: string) => n[0])
-        .join('')
-        .toUpperCase()
-        .slice(0, 2)
+  const userInitials = userFullName
+    ? userFullName.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)
     : 'U';
 
   const sidebar = (
@@ -289,7 +295,7 @@ export default function AdminLayout() {
           </div>
           <div className="flex-1 min-w-0">
             <p className="font-body text-[13px] text-text-primary truncate leading-tight">
-              {user?.name || 'User'}
+              {userFullName || 'User'}
             </p>
             <span className={`badge ${roleBadgeClass} mt-1`}>
               {roleBadge}

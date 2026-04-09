@@ -30,6 +30,8 @@ export default function Plans() {
   const [form, setForm] = useState<PlanForm>(emptyForm);
   const [submitting, setSubmitting] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Plan | null>(null);
+  const [deleteCheckLoading, setDeleteCheckLoading] = useState(false);
+  const [deleteCheckCount, setDeleteCheckCount] = useState(0);
 
   const fetchPlans = async () => {
     try {
@@ -66,6 +68,19 @@ export default function Plans() {
     });
     setEditingId(plan.id);
     setModalOpen(true);
+  };
+
+  const handleDeleteClick = async (plan: Plan) => {
+    setDeleteTarget(plan);
+    setDeleteCheckLoading(true);
+    try {
+      const res = await api.get<{ total: number }>(`/subscriptions?plan_id=${plan.id}&limit=1`);
+      setDeleteCheckCount(res.data.total ?? 0);
+    } catch {
+      setDeleteCheckCount(0);
+    } finally {
+      setDeleteCheckLoading(false);
+    }
   };
 
   const handleDelete = async (plan: Plan) => {
@@ -156,16 +171,25 @@ export default function Plans() {
       )}
 
       {/* Plans Grid */}
+      {(() => {
+        const sortedPlans = [...plans].sort((a, b) => Number(a.price) - Number(b.price));
+        return (
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 animate-in animate-in-1">
-        {plans.length === 0 ? (
+        {sortedPlans.length === 0 ? (
           <div className="col-span-full glass-card p-12 text-center">
             <svg className="w-14 h-14 text-[#334155] mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
             </svg>
-            <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, color: '#64748b' }}>No plans configured yet</p>
+            <p className="text-sm text-[#64748b] mb-3">No internet plans found</p>
+            <button onClick={openAdd} className="btn-primary flex items-center gap-2 mt-2 mx-auto">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+              </svg>
+              Create First Plan
+            </button>
           </div>
         ) : (
-          plans.map((plan) => (
+          sortedPlans.map((plan) => (
             <div key={plan.id} className="glass-card p-6 flex flex-col">
               {/* Plan Name */}
               <div className="flex items-start justify-between mb-4">
@@ -203,8 +227,8 @@ export default function Plans() {
 
               {/* Description */}
               {plan.description ? (
-                <p className="flex-1 mb-4 leading-relaxed" style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, color: '#64748b' }}>
-                  {plan.description}
+                <p className="flex-1 mb-4 leading-relaxed" style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, color: '#64748b' }} title={plan.description.length > 30 ? plan.description : undefined}>
+                  {plan.description.length > 30 ? `${plan.description.slice(0, 30)}…` : plan.description}
                 </p>
               ) : (
                 <div className="flex-1" />
@@ -222,7 +246,7 @@ export default function Plans() {
                   Edit
                 </button>
                 <button
-                  onClick={() => setDeleteTarget(plan)}
+                  onClick={() => handleDeleteClick(plan)}
                   className="btn-danger !py-2 !px-3 !text-xs flex items-center gap-1.5"
                 >
                   <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -235,13 +259,15 @@ export default function Plans() {
           ))
         )}
       </div>
+        );
+      })()}
 
       {/* Delete Confirmation Modal */}
       {deleteTarget && (
         <div
           className="modal-overlay"
           style={{ background: 'rgba(239,68,68,0.08)' }}
-          onClick={() => setDeleteTarget(null)}
+          onClick={() => { setDeleteTarget(null); setDeleteCheckCount(0); }}
         >
           <div
             className="modal-content !border-destructive/20"
@@ -260,8 +286,22 @@ export default function Plans() {
                 This cannot be undone. Active subscriptions on this plan will not be affected.
               </p>
             </div>
+            {deleteCheckLoading ? (
+              <div className="mb-4 flex items-center justify-center gap-2 text-sm text-[#64748b]">
+                <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
+                </svg>
+                Checking active subscriptions…
+              </div>
+            ) : deleteCheckCount > 0 ? (
+              <div className="mb-4 p-3 rounded-lg" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
+                <p className="text-sm text-red-400">
+                  ⚠️ This plan has {deleteCheckCount} active subscription{deleteCheckCount > 1 ? 's' : ''}. Deleting it will not affect existing subscriptions but new ones cannot use this plan.
+                </p>
+              </div>
+            ) : null}
             <div className="flex justify-center gap-3">
-              <button onClick={() => setDeleteTarget(null)} className="btn-outline">
+              <button onClick={() => { setDeleteTarget(null); setDeleteCheckCount(0); }} className="btn-outline">
                 Cancel
               </button>
               <button onClick={() => handleDelete(deleteTarget)} className="btn-danger">

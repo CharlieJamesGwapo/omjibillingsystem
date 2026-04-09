@@ -1,7 +1,7 @@
 // Type aliases matching Go model constants
 export type UserRole = 'admin' | 'technician' | 'customer'
 export type UserStatus = 'active' | 'inactive'
-export type SubStatus = 'active' | 'overdue' | 'suspended'
+export type SubStatus = 'active' | 'overdue' | 'suspended' | 'pending' | 'expired'
 export type PaymentMethod = 'gcash' | 'maya' | 'bank' | 'cash'
 export type PaymentStatus = 'pending' | 'approved' | 'rejected'
 

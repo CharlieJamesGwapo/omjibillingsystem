@@ -10,6 +10,7 @@ interface CustomerForm {
   password: string;
   email: string;
   address: string;
+  status: 'active' | 'inactive';
 }
 
 const emptyForm: CustomerForm = {
@@ -18,6 +19,7 @@ const emptyForm: CustomerForm = {
   password: '',
   email: '',
   address: '',
+  status: 'active',
 };
 
 const LIMIT = 20;
@@ -36,6 +38,7 @@ export default function Customers() {
   const [submitting, setSubmitting] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<User | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<'all' | UserStatus>('all');
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -53,6 +56,7 @@ export default function Customers() {
         limit: String(LIMIT),
       });
       if (debouncedSearch) params.set('search', debouncedSearch);
+      if (statusFilter !== 'all') params.set('status', statusFilter);
       const res = await api.get<{ data: User[]; total: number; page: number; limit: number }>(`/users?${params}`);
       setUsers(res.data.data ?? []);
       setTotal(res.data.total ?? 0);
@@ -66,7 +70,7 @@ export default function Customers() {
   useEffect(() => {
     setLoading(true);
     fetchUsers();
-  }, [page, debouncedSearch]);
+  }, [page, debouncedSearch, statusFilter]);
 
   const openAdd = () => {
     setForm(emptyForm);
@@ -81,6 +85,7 @@ export default function Customers() {
       password: '',
       email: user.email || '',
       address: user.address || '',
+      status: user.status || 'active',
     });
     setEditingId(user.id);
     setModalOpen(true);
@@ -94,6 +99,7 @@ export default function Customers() {
         const body: Record<string, string> = {
           full_name: form.full_name,
           phone: form.phone,
+          status: form.status,
         };
         if (form.email) body.email = form.email;
         if (form.address) body.address = form.address;
@@ -113,9 +119,10 @@ export default function Customers() {
       setLoading(true);
       await fetchUsers();
       toast.success(editingId ? 'Customer updated' : 'Customer created');
-    } catch {
-      setError(editingId ? 'Failed to update customer' : 'Failed to add customer');
-      toast.error('Something went wrong');
+    } catch (err: any) {
+      const msg = err?.response?.data?.error || err?.message || (editingId ? 'Failed to update customer' : 'Failed to add customer');
+      setError(msg);
+      toast.error(msg);
     } finally {
       setSubmitting(false);
     }
@@ -189,6 +196,23 @@ export default function Customers() {
         </div>
       )}
 
+      {/* Status Filter Pills */}
+      <div className="flex flex-wrap gap-2 animate-in animate-in-1">
+        {(['all', 'active', 'inactive'] as const).map(s => (
+          <button
+            key={s}
+            onClick={() => { setStatusFilter(s); setPage(1); }}
+            className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-all ${
+              statusFilter === s
+                ? 'bg-secondary text-[#060a13]'
+                : 'bg-white/5 text-[#64748b] hover:bg-white/8 hover:text-[#94a3b8]'
+            }`}
+          >
+            {s === 'all' ? 'All' : s.charAt(0).toUpperCase() + s.slice(1)}
+          </button>
+        ))}
+      </div>
+
       {/* Search */}
       <div className="relative w-full sm:max-w-md animate-in animate-in-1">
         <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#475569]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -212,6 +236,7 @@ export default function Customers() {
                 <th>Name</th>
                 <th>Phone</th>
                 <th>Email</th>
+                <th>Address</th>
                 <th>Status</th>
                 <th>Actions</th>
               </tr>
@@ -219,7 +244,7 @@ export default function Customers() {
             <tbody>
               {users.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="!text-center !py-16">
+                  <td colSpan={6} className="!text-center !py-16">
                     <div className="flex flex-col items-center gap-3">
                       <svg className="w-12 h-12 text-[#334155]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z" />
@@ -234,6 +259,11 @@ export default function Customers() {
                     <td className="!font-semibold !text-[#f1f5f9]">{user.full_name}</td>
                     <td><span className="font-mono text-xs">{user.phone}</span></td>
                     <td>{user.email || <span className="text-[#334155]">--</span>}</td>
+                    <td>
+                      {user.address
+                        ? <span title={user.address}>{user.address.length > 20 ? user.address.slice(0, 20) + '…' : user.address}</span>
+                        : <span className="text-[#334155]">--</span>}
+                    </td>
                     <td>{statusBadge(user.status)}</td>
                     <td>
                       <div className="flex items-center gap-1">
@@ -294,6 +324,11 @@ export default function Customers() {
               </div>
               {user.email && (
                 <p className="text-xs text-[#64748b]" style={{ fontFamily: "'Outfit', sans-serif" }}>{user.email}</p>
+              )}
+              {user.address && (
+                <p className="text-xs text-[#64748b] mt-0.5" style={{ fontFamily: "'Outfit', sans-serif" }}>
+                  {user.address.length > 20 ? user.address.slice(0, 20) + '…' : user.address}
+                </p>
               )}
             </div>
           ))
@@ -408,6 +443,27 @@ export default function Customers() {
                   className="form-input"
                 />
               </div>
+              {editingId && (
+                <div>
+                  <label className="form-label">Status</label>
+                  <div className="flex gap-3 mt-1">
+                    {(['active', 'inactive'] as const).map(s => (
+                      <button
+                        key={s}
+                        type="button"
+                        onClick={() => setForm(f => ({ ...f, status: s }))}
+                        className={`px-4 py-2 rounded-lg text-sm font-semibold border transition-all ${
+                          form.status === s
+                            ? s === 'active' ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-400' : 'bg-red-500/15 border-red-500/40 text-red-400'
+                            : 'bg-transparent border-white/10 text-[#64748b] hover:border-white/20'
+                        }`}
+                      >
+                        {s.charAt(0).toUpperCase() + s.slice(1)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
               <div className="flex justify-end gap-3 pt-4" style={{ borderTop: '1px solid rgba(34,211,238,0.06)' }}>
                 <button type="button" onClick={() => setModalOpen(false)} className="btn-outline">
                   Cancel

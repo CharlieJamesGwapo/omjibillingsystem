@@ -81,6 +81,7 @@ export default function Subscriptions() {
   const [filter, setFilter] = useState<'all' | SubStatus>(initialStatus ?? 'all');
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
+  const [statusCounts, setStatusCounts] = useState<Record<string, number>>({});
 
   // Disconnect confirmation modal state
   const [disconnectTarget, setDisconnectTarget] = useState<Subscription | null>(null);
@@ -109,15 +110,25 @@ export default function Subscriptions() {
       if (debouncedSearch) params.set('search', debouncedSearch);
       if (filter !== 'all') params.set('status', filter);
 
-      const [subsRes, usersRes, plansRes] = await Promise.all([
+      const allStatuses: SubStatus[] = ['active', 'overdue', 'suspended', 'pending'];
+      const [subsRes, usersRes, plansRes, ...statusRes] = await Promise.all([
         api.get<{ data: Subscription[]; total: number; page: number; limit: number }>(`/subscriptions?${params}`),
         api.get<{ data: User[]; total: number }>('/users?role=customer&limit=1000'),
-        api.get<Plan[]>('/plans'),
+        api.get<{ data: Plan[] }>('/plans'),
+        ...allStatuses.map((s) =>
+          api.get<{ total: number }>(`/subscriptions?limit=1&status=${s}`)
+        ),
       ]);
       setSubscriptions(subsRes.data.data ?? []);
       setTotal(subsRes.data.total ?? 0);
       setUsers(usersRes.data.data ?? []);
-      setPlans(plansRes.data ?? []);
+      setPlans(plansRes.data.data ?? []);
+      const counts: Record<string, number> = {};
+      allStatuses.forEach((s, i) => {
+        counts[s] = statusRes[i].data.total ?? 0;
+      });
+      counts['all'] = allStatuses.reduce((sum, s) => sum + (counts[s] ?? 0), 0);
+      setStatusCounts(counts);
     } catch {
       setError('Failed to load data');
     } finally {
@@ -267,6 +278,7 @@ export default function Subscriptions() {
     { label: 'Active', value: 'active' as SubStatus },
     { label: 'Overdue', value: 'overdue' as SubStatus },
     { label: 'Suspended', value: 'suspended' as SubStatus },
+    { label: 'Pending', value: 'pending' as SubStatus },
   ];
 
   const DueDateCell = ({ sub }: { sub: Subscription }) => {
@@ -345,20 +357,36 @@ export default function Subscriptions() {
 
       {/* Status Filter Pills */}
       <div className="flex gap-2 flex-wrap animate-in animate-in-1">
-        {filterButtons.map((btn) => (
-          <button
-            key={btn.value}
-            onClick={() => handleFilterChange(btn.value)}
-            className="flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition-all duration-200"
-            style={
-              filter === btn.value
-                ? { background: '#22d3ee', color: '#fff', fontFamily: "'Rajdhani', sans-serif", letterSpacing: '0.05em', fontSize: 13 }
-                : { background: 'rgba(15,26,46,0.6)', border: '1px solid rgba(34,211,238,0.06)', color: '#94a3b8', fontFamily: "'Rajdhani', sans-serif", letterSpacing: '0.05em', fontSize: 13 }
-            }
-          >
-            {btn.label}
-          </button>
-        ))}
+        {filterButtons.map((btn) => {
+          const count = statusCounts[btn.value];
+          const isActive = filter === btn.value;
+          return (
+            <button
+              key={btn.value}
+              onClick={() => handleFilterChange(btn.value)}
+              className="flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition-all duration-200"
+              style={
+                isActive
+                  ? { background: '#22d3ee', color: '#fff', fontFamily: "'Rajdhani', sans-serif", letterSpacing: '0.05em', fontSize: 13 }
+                  : { background: 'rgba(15,26,46,0.6)', border: '1px solid rgba(34,211,238,0.06)', color: '#94a3b8', fontFamily: "'Rajdhani', sans-serif", letterSpacing: '0.05em', fontSize: 13 }
+              }
+            >
+              {btn.label}
+              {count !== undefined && (
+                <span
+                  className="inline-flex items-center justify-center rounded-full min-w-[18px] h-[18px] px-1 text-[10px] font-bold leading-none"
+                  style={
+                    isActive
+                      ? { background: 'rgba(0,0,0,0.2)', color: '#fff' }
+                      : { background: 'rgba(34,211,238,0.12)', color: '#22d3ee' }
+                  }
+                >
+                  {count}
+                </span>
+              )}
+            </button>
+          );
+        })}
       </div>
 
       {/* Desktop Table */}
@@ -386,7 +414,9 @@ export default function Subscriptions() {
                       <svg className="w-12 h-12 text-[#334155]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M8.288 15.038a5.25 5.25 0 0 1 7.424 0M5.106 11.856c3.807-3.808 9.98-3.808 13.788 0M1.924 8.674c5.565-5.565 14.587-5.565 20.152 0M12.53 18.22l-.53.53-.53-.53a.75.75 0 0 1 1.06 0Z" />
                       </svg>
-                      <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, color: '#64748b' }}>No subscriptions found</p>
+                      <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, color: '#64748b' }}>
+                        {filter === 'all' ? 'No subscriptions found' : `No ${filter} subscriptions`}
+                      </p>
                     </div>
                   </td>
                 </tr>
@@ -488,7 +518,9 @@ export default function Subscriptions() {
             <svg className="w-12 h-12 text-[#334155] mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M8.288 15.038a5.25 5.25 0 0 1 7.424 0M5.106 11.856c3.807-3.808 9.98-3.808 13.788 0M1.924 8.674c5.565-5.565 14.587-5.565 20.152 0M12.53 18.22l-.53.53-.53-.53a.75.75 0 0 1 1.06 0Z" />
             </svg>
-            <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, color: '#64748b' }}>No subscriptions found</p>
+            <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, color: '#64748b' }}>
+              {filter === 'all' ? 'No subscriptions found' : `No ${filter} subscriptions`}
+            </p>
           </div>
         ) : (
           subscriptions.map((sub) => (
@@ -635,9 +667,25 @@ export default function Subscriptions() {
                 </h2>
               </div>
             </div>
-            <p className="text-sm mb-6" style={{ color: '#94a3b8', fontFamily: "'Outfit', sans-serif" }}>
-              This will suspend their connection and disable their MikroTik access.
-            </p>
+            <div className="mb-6 space-y-2">
+              <p className="text-sm" style={{ color: '#94a3b8', fontFamily: "'Outfit', sans-serif" }}>
+                This will immediately disable the PPPoE secret on MikroTik, dropping the client's active session. Their subscription record will remain active — no billing changes are made.
+              </p>
+              <ul className="text-xs space-y-1" style={{ color: '#64748b', fontFamily: "'Outfit', sans-serif" }}>
+                <li className="flex items-start gap-2">
+                  <span style={{ color: '#f87171', marginTop: 2 }}>&#x2022;</span>
+                  <span>PPPoE login will be blocked on the router</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span style={{ color: '#f87171', marginTop: 2 }}>&#x2022;</span>
+                  <span>Subscription status stays unchanged — use Reconnect to restore access</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span style={{ color: '#f87171', marginTop: 2 }}>&#x2022;</span>
+                  <span>No invoices are cancelled or modified</span>
+                </li>
+              </ul>
+            </div>
             <div className="flex justify-end gap-3">
               <button
                 type="button"
@@ -680,7 +728,7 @@ export default function Subscriptions() {
                   <option value="">Select customer</option>
                   {users.map((u) => (
                     <option key={u.id} value={u.id}>
-                      {u.full_name}
+                      {u.full_name}{u.phone ? ` (${u.phone})` : ''}
                     </option>
                   ))}
                 </select>
@@ -710,7 +758,7 @@ export default function Subscriptions() {
               </div>
 
               {/* IP / MAC */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="form-label">IP Address</label>
                   <input
@@ -769,7 +817,7 @@ export default function Subscriptions() {
 
               {/* Billing Day */}
               <div>
-                <label className="form-label">Billing Day (1-28) *</label>
+                <label className="form-label">Billing Day *</label>
                 <input
                   type="number"
                   min={1}
@@ -778,8 +826,12 @@ export default function Subscriptions() {
                   onChange={(e) => setForm({ ...form, billing_day: e.target.value })}
                   className={`form-input${formErrors.billing_day ? ' !border-red-500' : ''}`}
                 />
-                {formErrors.billing_day && (
+                {formErrors.billing_day ? (
                   <p className="text-xs text-red-400 mt-1">{formErrors.billing_day}</p>
+                ) : (
+                  <p className="text-xs mt-1" style={{ color: '#475569' }}>
+                    Day of month the invoice is generated (1–28). Day 29–31 are not allowed to ensure all months are covered.
+                  </p>
                 )}
               </div>
 

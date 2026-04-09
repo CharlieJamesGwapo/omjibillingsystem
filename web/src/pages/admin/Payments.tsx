@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import api from '../../lib/api'
-import { formatCurrency, formatDate } from '../../lib/utils'
+import { formatCurrency, formatDate, exportToCSV } from '../../lib/utils'
 import { toast } from 'sonner'
 import type { Payment, PaymentStatus } from '../../lib/types'
 
@@ -212,7 +212,7 @@ export default function Payments() {
     payment: Payment
   } | null>(null)
 
-  // Tab counts (derived from current page; pending from 'all' fetch is most accurate)
+  // Tab counts fetched independently so they are always accurate across all pages
   const [tabCounts, setTabCounts] = useState({ all: 0, pending: 0, approved: 0, rejected: 0 })
 
   // Debounce search
@@ -223,6 +223,30 @@ export default function Payments() {
     }, 300)
     return () => clearTimeout(timer)
   }, [search])
+
+  const fetchCounts = useCallback(async () => {
+    try {
+      const [pendingRes, approvedRes, rejectedRes] = await Promise.all([
+        api.get<{ total: number }>('/payments?status=pending&page=1&limit=1'),
+        api.get<{ total: number }>('/payments?status=approved&page=1&limit=1'),
+        api.get<{ total: number }>('/payments?status=rejected&page=1&limit=1'),
+      ])
+      const pending = pendingRes.data.total ?? 0
+      const approved = approvedRes.data.total ?? 0
+      const rejected = rejectedRes.data.total ?? 0
+      setTabCounts({
+        all: pending + approved + rejected,
+        pending,
+        approved,
+        rejected,
+      })
+    } catch { /* ignore — counts are non-critical */ }
+  }, [])
+
+  // Fetch counts once on mount
+  useEffect(() => {
+    fetchCounts()
+  }, [fetchCounts])
 
   const fetchPayments = useCallback(async () => {
     setLoading(true)
@@ -240,22 +264,6 @@ export default function Payments() {
       const data = res.data.data ?? []
       setPayments(data)
       setTotal(res.data.total ?? 0)
-
-      // Recompute tab counts from current page data (best effort without extra requests)
-      setTabCounts((prev) => {
-        const pending = data.filter((p) => p.status === 'pending').length
-        const approved = data.filter((p) => p.status === 'approved').length
-        const rejected = data.filter((p) => p.status === 'rejected').length
-        // When viewing a filtered tab, update only that tab's total from the server
-        if (filter === 'all') {
-          return { all: res.data.total, pending, approved, rejected }
-        }
-        return {
-          ...prev,
-          all: prev.all || res.data.total,
-          [filter]: res.data.total,
-        }
-      })
     } catch {
       toast.error('Failed to load payments — please try again')
     } finally {
@@ -345,9 +353,14 @@ export default function Payments() {
     setActionLoading(true)
     try {
       await api.post(`/payments/${payment.id}/${action}`, { notes: notes || undefined })
-      toast.success(action === 'approve' ? 'Payment approved!' : 'Payment rejected')
+      const amountStr = formatCurrency(payment.amount)
+      toast.success(
+        action === 'approve'
+          ? `Payment of ${amountStr} approved!`
+          : `Payment of ${amountStr} rejected`
+      )
       setConfirmModal(null)
-      await fetchPayments()
+      await Promise.all([fetchPayments(), fetchCounts()])
     } catch {
       toast.error('Failed — please try again')
     } finally {
@@ -367,6 +380,24 @@ export default function Payments() {
     pending: tabCounts.pending,
     approved: tabCounts.approved,
     rejected: tabCounts.rejected,
+  }
+
+  const handleExport = () => {
+    if (payments.length === 0) {
+      toast.error('Nothing to export')
+      return
+    }
+    const rows = payments.map((p) => ({
+      Date: formatDate(p.created_at),
+      Customer: p.user_name ?? '—',
+      Amount: p.amount,
+      Method: p.method,
+      Status: p.status,
+      Reference: p.reference_number ?? '—',
+      'Billing Start': p.billing_period_start ? formatDate(p.billing_period_start) : '—',
+      'Billing End': p.billing_period_end ? formatDate(p.billing_period_end) : '—',
+    }))
+    exportToCSV(`payments-${filter}-${new Date().toISOString().slice(0, 10)}.csv`, rows)
   }
 
   const totalPages = Math.ceil(total / LIMIT)
@@ -413,9 +444,22 @@ export default function Payments() {
   return (
     <div className="space-y-6">
       {/* Page Header */}
-      <div className="animate-in">
-        <h1 className="page-header">Payments</h1>
-        <p className="page-subtitle">Review and manage all payment transactions</p>
+      <div className="animate-in flex items-start justify-between gap-4">
+        <div>
+          <h1 className="page-header">Payments</h1>
+          <p className="page-subtitle">Review and manage all payment transactions</p>
+        </div>
+        <button
+          onClick={handleExport}
+          disabled={payments.length === 0}
+          className="btn-outline flex items-center gap-2 shrink-0 disabled:opacity-30"
+          title="Export current view to CSV"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
+          </svg>
+          Export
+        </button>
       </div>
 
       {/* Stats Row */}
@@ -771,65 +815,98 @@ export default function Payments() {
           </div>
         ) : (
           payments.map((payment) => (
-            <div key={payment.id} className="glass-card p-4">
-              {/* Header */}
-              <div className="flex items-start justify-between mb-3">
-                <div className="flex items-center gap-3">
-                  <div
-                    className="w-9 h-9 rounded-full flex items-center justify-center shrink-0"
-                    style={{
-                      background: 'rgba(34,211,238,0.1)',
-                      color: '#22d3ee',
-                      fontFamily: "'Rajdhani', sans-serif",
-                      fontSize: 12,
-                      fontWeight: 700,
-                    }}
-                  >
-                    {getInitials(payment.user_name ?? '?')}
-                  </div>
-                  <div>
-                    <p
-                      className="font-semibold"
-                      style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 15, color: '#f1f5f9' }}
-                    >
-                      {payment.user_name ?? '—'}
-                    </p>
-                    <p style={{ fontSize: 12, color: '#64748b' }}>{payment.user_phone ?? ''}</p>
-                  </div>
-                </div>
-                {statusBadge(payment.status, payment.notes)}
-              </div>
-
-              {/* Amount + Method */}
-              <div className="flex items-center justify-between mb-3">
+            <div
+              key={payment.id}
+              className="glass-card p-4"
+              style={{
+                borderLeft: `3px solid ${
+                  payment.status === 'approved'
+                    ? 'rgba(16,185,129,0.6)'
+                    : payment.status === 'rejected'
+                    ? 'rgba(239,68,68,0.5)'
+                    : 'rgba(245,158,11,0.6)'
+                }`,
+              }}
+            >
+              {/* Top row: amount (hero) + status badge */}
+              <div className="flex items-center justify-between mb-2">
                 <span
                   style={{
                     fontFamily: "'Rajdhani', sans-serif",
-                    fontWeight: 700,
-                    fontSize: 20,
+                    fontWeight: 800,
+                    fontSize: 22,
                     color: '#f1f5f9',
+                    letterSpacing: '0.02em',
                   }}
                 >
                   {formatCurrency(payment.amount)}
                 </span>
-                {methodBadge(payment.method)}
+                {statusBadge(payment.status, payment.notes)}
               </div>
 
-              {/* Reference */}
-              {payment.reference_number && (
-                <p
-                  className="font-mono text-xs text-[#64748b] mb-3 px-2 py-1 rounded inline-block"
-                  style={{ background: 'rgba(15,23,41,0.8)' }}
+              {/* Customer row */}
+              <div className="flex items-center gap-2.5 mb-3">
+                <div
+                  className="w-8 h-8 rounded-full flex items-center justify-center shrink-0"
+                  style={{
+                    background: 'rgba(34,211,238,0.1)',
+                    color: '#22d3ee',
+                    fontFamily: "'Rajdhani', sans-serif",
+                    fontSize: 11,
+                    fontWeight: 700,
+                  }}
                 >
-                  Ref: {payment.reference_number}
-                </p>
-              )}
+                  {getInitials(payment.user_name ?? '?')}
+                </div>
+                <div className="min-w-0">
+                  <p
+                    className="font-semibold truncate"
+                    style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 15, color: '#f1f5f9' }}
+                  >
+                    {payment.user_name ?? '—'}
+                  </p>
+                  {payment.user_phone && (
+                    <p className="text-xs truncate" style={{ color: '#64748b' }}>
+                      {payment.user_phone}
+                    </p>
+                  )}
+                </div>
+                <div className="ml-auto shrink-0">{methodBadge(payment.method)}</div>
+              </div>
+
+              {/* Meta row: ref + date */}
+              <div
+                className="flex flex-wrap items-center gap-x-4 gap-y-1 pb-3 mb-3"
+                style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}
+              >
+                {payment.reference_number && (
+                  <span
+                    className="font-mono text-xs px-2 py-0.5 rounded"
+                    style={{ background: 'rgba(15,23,41,0.8)', color: '#64748b' }}
+                  >
+                    Ref: {payment.reference_number}
+                  </span>
+                )}
+                <span className="text-xs" style={{ color: '#475569' }}>
+                  {formatDate(payment.created_at)}
+                </span>
+              </div>
 
               {/* Billing Period */}
               {payment.billing_period_start && payment.billing_period_end && (
-                <p className="text-xs mb-3" style={{ color: '#64748b' }}>
-                  Period: {formatDate(payment.billing_period_start)} → {formatDate(payment.billing_period_end)}
-                </p>
+                <div
+                  className="flex items-center gap-2 mb-3 px-2.5 py-1.5 rounded-lg"
+                  style={{ background: 'rgba(34,211,238,0.05)', border: '1px solid rgba(34,211,238,0.08)' }}
+                >
+                  <svg className="w-3.5 h-3.5 shrink-0" style={{ color: '#22d3ee' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5" />
+                  </svg>
+                  <span className="text-xs" style={{ color: '#94a3b8' }}>
+                    {formatDate(payment.billing_period_start)}
+                    <span style={{ color: '#334155', margin: '0 4px' }}>→</span>
+                    {formatDate(payment.billing_period_end)}
+                  </span>
+                </div>
               )}
 
               {/* Proof thumbnail */}
@@ -853,10 +930,7 @@ export default function Payments() {
 
               {/* Actions */}
               {payment.status === 'pending' && (
-                <div
-                  className="flex gap-2 pt-3"
-                  style={{ borderTop: '1px solid rgba(34,211,238,0.06)' }}
-                >
+                <div className="flex gap-2">
                   <button
                     onClick={() => openConfirm('approve', payment)}
                     className="btn-success !py-2 !px-4 !text-xs flex-1"
@@ -873,17 +947,10 @@ export default function Payments() {
               )}
 
               {payment.status !== 'pending' && payment.approver_name && (
-                <p
-                  className="text-xs pt-2"
-                  style={{ color: '#64748b', borderTop: '1px solid rgba(34,211,238,0.06)' }}
-                >
+                <p className="text-xs" style={{ color: '#64748b' }}>
                   {payment.status === 'approved' ? 'Approved' : 'Reviewed'} by {payment.approver_name}
                 </p>
               )}
-
-              <p className="text-xs mt-2" style={{ color: '#475569' }}>
-                Submitted {formatDate(payment.created_at)}
-              </p>
             </div>
           ))
         )}

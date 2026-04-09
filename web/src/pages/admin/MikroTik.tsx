@@ -151,6 +151,12 @@ export default function MikroTik() {
   const [showConfigPw, setShowConfigPw] = useState(false);
   const [showPPPoEPw, setShowPPPoEPw] = useState(false);
 
+  // PPPoE search
+  const [pppoeSearch, setPppoeSearch] = useState('');
+
+  // Setup guide accordion
+  const [guideOpen, setGuideOpen] = useState(false);
+
   // Loading/result flags
   const [testingConn, setTestingConn] = useState(false);
   const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null);
@@ -314,6 +320,16 @@ export default function MikroTik() {
     ? Math.floor((Date.now() - lastRefreshed.getTime()) / 1000)
     : null;
 
+  const filteredSecrets = pppoeSearch.trim()
+    ? pppoeSecrets.filter(
+        (s) =>
+          s.name.toLowerCase().includes(pppoeSearch.toLowerCase()) ||
+          (s.profile ?? '').toLowerCase().includes(pppoeSearch.toLowerCase()),
+      )
+    : pppoeSecrets;
+
+  const fullyDisconnected = status !== null && !status.connected && !status.agent_connected;
+
   // ── Render ─────────────────────────────────────────────────────────────────
   if (loading && !status) return <LoadingSkeleton />;
 
@@ -388,8 +404,35 @@ export default function MikroTik() {
         </div>
       </div>
 
+      {/* ── Fully disconnected banner ── */}
+      {fullyDisconnected && (
+        <div
+          className="rounded-xl border p-4 flex items-start gap-3"
+          style={{ background: 'rgba(239,68,68,0.06)', borderColor: 'rgba(239,68,68,0.25)' }}
+        >
+          <svg className="w-5 h-5 flex-shrink-0 mt-0.5" style={{ color: '#f87171' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+          </svg>
+          <div className="flex-1">
+            <p className="text-sm font-semibold" style={{ color: '#f87171' }}>MikroTik is not configured</p>
+            <p className="text-xs mt-0.5 text-text-secondary">
+              Neither the local bridge agent nor a direct connection is active. Follow the{' '}
+              <button
+                type="button"
+                onClick={() => { setGuideOpen(true); window.setTimeout(() => document.getElementById('setup-guide')?.scrollIntoView({ behavior: 'smooth' }), 50); }}
+                className="underline font-medium hover:opacity-80 transition-opacity"
+                style={{ color: '#f87171' }}
+              >
+                Setup Guide
+              </button>{' '}
+              at the bottom of this page to get started.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* ── Agent offline warning ── */}
-      {!status?.agent_connected && (
+      {!fullyDisconnected && !status?.agent_connected && (
         <div
           className="rounded-xl border p-4 flex items-start gap-3"
           style={{ background: 'rgba(234,179,8,0.06)', borderColor: 'rgba(234,179,8,0.25)' }}
@@ -544,27 +587,53 @@ export default function MikroTik() {
 
       {/* ── Section 3: PPPoE Secrets ── */}
       <div className="glass-card overflow-hidden">
-        <div className="px-5 py-4 border-b border-white/5 flex items-center justify-between">
-          <div className="flex items-center gap-3">
+        <div className="px-5 py-4 border-b border-white/5 flex flex-col sm:flex-row sm:items-center gap-3">
+          <div className="flex items-center gap-3 flex-1">
             <h2 className="font-heading text-base font-bold text-text-primary">PPPoE Secrets</h2>
             <span
               className="inline-flex items-center justify-center rounded-full text-xs font-semibold px-2 py-0.5"
               style={{ background: 'rgba(34,211,238,0.1)', color: '#22d3ee' }}
             >
-              {pppoeSecrets.length}
+              {filteredSecrets.length}{pppoeSearch.trim() && pppoeSecrets.length !== filteredSecrets.length ? `/${pppoeSecrets.length}` : ''}
             </span>
           </div>
-          {isAdmin && (
-            <button
-              onClick={() => { setPppoeForm(emptyPPPoEForm); setShowAddSecretModal(true); }}
-              className="btn-primary !py-2 !px-4 !text-xs flex items-center gap-1.5"
-            >
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+          <div className="flex items-center gap-2 flex-1 sm:flex-none">
+            {/* Search */}
+            <div className="relative flex-1 sm:w-52">
+              <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-secondary/50 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
               </svg>
-              Add Secret
-            </button>
-          )}
+              <input
+                type="text"
+                placeholder="Filter by username or profile…"
+                value={pppoeSearch}
+                onChange={(e) => setPppoeSearch(e.target.value)}
+                className="form-input !py-1.5 !pl-8 !text-xs w-full"
+              />
+              {pppoeSearch && (
+                <button
+                  type="button"
+                  onClick={() => setPppoeSearch('')}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-text-secondary/50 hover:text-text-secondary"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              )}
+            </div>
+            {isAdmin && (
+              <button
+                onClick={() => { setPppoeForm(emptyPPPoEForm); setShowAddSecretModal(true); }}
+                className="btn-primary !py-2 !px-4 !text-xs flex items-center gap-1.5 flex-shrink-0"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                </svg>
+                Add Secret
+              </button>
+            )}
+          </div>
         </div>
 
         {pppoeSecrets.length === 0 ? (
@@ -590,7 +659,14 @@ export default function MikroTik() {
                 </tr>
               </thead>
               <tbody>
-                {pppoeSecrets.map((secret) => (
+                {filteredSecrets.length === 0 && (
+                  <tr>
+                    <td colSpan={isAdmin ? 5 : 4} className="!text-center !py-10">
+                      <p className="text-text-secondary text-sm">No secrets match "{pppoeSearch}"</p>
+                    </td>
+                  </tr>
+                )}
+                {filteredSecrets.map((secret) => (
                   <tr key={secret.name}>
                     <td>
                       <span className="font-mono text-sm text-text-primary">{secret.name}</span>
@@ -631,6 +707,288 @@ export default function MikroTik() {
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+      </div>
+
+      {/* ── Section 4: Setup Guide ── */}
+      <div id="setup-guide" className="glass-card overflow-hidden">
+        {/* Accordion header */}
+        <button
+          type="button"
+          onClick={() => setGuideOpen((o) => !o)}
+          className="w-full px-5 py-4 flex items-center justify-between text-left transition-colors hover:bg-white/[0.02]"
+        >
+          <div className="flex items-center gap-3">
+            <div
+              className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 text-base font-bold"
+              style={{ background: 'rgba(34,211,238,0.1)', border: '1px solid rgba(34,211,238,0.2)', color: '#22d3ee' }}
+            >
+              ?
+            </div>
+            <div>
+              <h2 className="font-heading text-base font-bold text-text-primary">Setup Guide</h2>
+              <p className="text-xs text-text-secondary mt-0.5">How to activate and configure MikroTik integration</p>
+            </div>
+          </div>
+          <svg
+            className={`w-5 h-5 text-text-secondary transition-transform duration-200 flex-shrink-0 ${guideOpen ? 'rotate-180' : ''}`}
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="m19 9-7 7-7-7" />
+          </svg>
+        </button>
+
+        {/* Accordion body */}
+        {guideOpen && (
+          <div className="px-5 pb-6 space-y-6 border-t border-white/5">
+
+            {/* Intro */}
+            <p className="text-sm text-text-secondary pt-4">
+              Choose the connection mode that fits your infrastructure. Most ISPs running a cloud-hosted backend
+              should use the <strong className="text-text-primary">Local Bridge Agent</strong> mode.
+            </p>
+
+            {/* Mode 1 – Agent (cyan) */}
+            <div
+              className="rounded-xl p-5 space-y-4"
+              style={{ background: 'rgba(34,211,238,0.04)', border: '1px solid rgba(34,211,238,0.15)' }}
+            >
+              <div className="flex items-center gap-2.5">
+                <div
+                  className="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 text-xs font-bold"
+                  style={{ background: 'rgba(34,211,238,0.15)', color: '#22d3ee' }}
+                >
+                  1
+                </div>
+                <div>
+                  <h3 className="font-heading font-bold text-sm" style={{ color: '#22d3ee' }}>
+                    Mode 1 — Local Bridge Agent
+                    <span
+                      className="ml-2 text-xs font-medium px-2 py-0.5 rounded-full"
+                      style={{ background: 'rgba(34,211,238,0.12)', color: '#67e8f9' }}
+                    >
+                      Recommended
+                    </span>
+                  </h3>
+                  <p className="text-xs text-text-secondary mt-0.5">
+                    Use when your MikroTik is on a local network and the backend (Render cloud) can't reach it directly.
+                    The agent connects <em>outbound</em> via WebSocket — no port forwarding required.
+                  </p>
+                </div>
+              </div>
+
+              <ol className="space-y-3 text-sm text-text-secondary pl-1">
+                <li className="flex gap-3">
+                  <span
+                    className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5"
+                    style={{ background: 'rgba(34,211,238,0.1)', color: '#22d3ee' }}
+                  >
+                    1
+                  </span>
+                  <span>Download the agent binary from your server admin panel.</span>
+                </li>
+                <li className="flex gap-3">
+                  <span
+                    className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5"
+                    style={{ background: 'rgba(34,211,238,0.1)', color: '#22d3ee' }}
+                  >
+                    2
+                  </span>
+                  <span>
+                    Retrieve your <code className="text-xs px-1.5 py-0.5 rounded" style={{ background: 'rgba(255,255,255,0.07)', color: '#22d3ee' }}>AGENT_SECRET</code> from{' '}
+                    <strong className="text-text-primary">Settings › Security</strong> tab.
+                  </span>
+                </li>
+                <li className="flex gap-3">
+                  <span
+                    className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5"
+                    style={{ background: 'rgba(34,211,238,0.1)', color: '#22d3ee' }}
+                  >
+                    3
+                  </span>
+                  <div className="flex-1">
+                    <p>Run the agent on any machine in the same network as the router:</p>
+                    <pre
+                      className="mt-2 rounded-lg px-4 py-3 text-xs font-mono overflow-x-auto"
+                      style={{ background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(34,211,238,0.12)', color: '#67e8f9' }}
+                    >
+{`AGENT_SECRET=your_secret_key ./omji-agent`}
+                    </pre>
+                  </div>
+                </li>
+                <li className="flex gap-3">
+                  <span
+                    className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5"
+                    style={{ background: 'rgba(34,211,238,0.1)', color: '#22d3ee' }}
+                  >
+                    4
+                  </span>
+                  <span>
+                    The agent connects <em>out</em> to the billing system via WebSocket. No firewall rules or port forwarding needed on the router side.
+                  </span>
+                </li>
+                <li className="flex gap-3">
+                  <span
+                    className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5"
+                    style={{ background: 'rgba(34,211,238,0.1)', color: '#22d3ee' }}
+                  >
+                    5
+                  </span>
+                  <span>
+                    In <strong className="text-text-primary">Settings › MikroTik</strong>, configure the router's local IP
+                    (e.g.{' '}
+                    <code className="text-xs px-1.5 py-0.5 rounded" style={{ background: 'rgba(255,255,255,0.07)', color: '#22d3ee' }}>192.168.88.1</code>),
+                    port <code className="text-xs px-1.5 py-0.5 rounded" style={{ background: 'rgba(255,255,255,0.07)', color: '#22d3ee' }}>8728</code>,
+                    username, and password.
+                  </span>
+                </li>
+                <li className="flex gap-3">
+                  <span
+                    className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5"
+                    style={{ background: 'rgba(34,211,238,0.1)', color: '#22d3ee' }}
+                  >
+                    6
+                  </span>
+                  <span>
+                    Click <strong className="text-text-primary">Save &amp; Connect</strong>. The <em>Local Agent</em> status indicator above should turn green.
+                  </span>
+                </li>
+              </ol>
+            </div>
+
+            {/* Mode 2 – Direct TCP (purple) */}
+            <div
+              className="rounded-xl p-5 space-y-4"
+              style={{ background: 'rgba(168,85,247,0.04)', border: '1px solid rgba(168,85,247,0.15)' }}
+            >
+              <div className="flex items-center gap-2.5">
+                <div
+                  className="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 text-xs font-bold"
+                  style={{ background: 'rgba(168,85,247,0.15)', color: '#c084fc' }}
+                >
+                  2
+                </div>
+                <div>
+                  <h3 className="font-heading font-bold text-sm" style={{ color: '#c084fc' }}>
+                    Mode 2 — Direct TCP Connection
+                  </h3>
+                  <p className="text-xs text-text-secondary mt-0.5">
+                    Use when the MikroTik API port is publicly accessible, or the backend is on the same network as the router.
+                  </p>
+                </div>
+              </div>
+
+              <ol className="space-y-3 text-sm text-text-secondary pl-1">
+                <li className="flex gap-3">
+                  <span
+                    className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5"
+                    style={{ background: 'rgba(168,85,247,0.1)', color: '#c084fc' }}
+                  >
+                    1
+                  </span>
+                  <span>
+                    On your MikroTik, enable the API service:{' '}
+                    <strong className="text-text-primary">IP › Services › api</strong> — set to enabled on port{' '}
+                    <code className="text-xs px-1.5 py-0.5 rounded" style={{ background: 'rgba(255,255,255,0.07)', color: '#c084fc' }}>8728</code>.
+                    <br />
+                    <span className="text-xs">
+                      Or via terminal:{' '}
+                      <code className="px-1.5 py-0.5 rounded" style={{ background: 'rgba(255,255,255,0.07)', color: '#c084fc' }}>
+                        /ip service set api disabled=no
+                      </code>
+                    </span>
+                  </span>
+                </li>
+                <li className="flex gap-3">
+                  <span
+                    className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5"
+                    style={{ background: 'rgba(168,85,247,0.1)', color: '#c084fc' }}
+                  >
+                    2
+                  </span>
+                  <span>
+                    Create a dedicated API user:{' '}
+                    <strong className="text-text-primary">System › Users › Add</strong> — assign at minimum the{' '}
+                    <code className="text-xs px-1.5 py-0.5 rounded" style={{ background: 'rgba(255,255,255,0.07)', color: '#c084fc' }}>api</code>,{' '}
+                    <code className="text-xs px-1.5 py-0.5 rounded" style={{ background: 'rgba(255,255,255,0.07)', color: '#c084fc' }}>read</code>, and{' '}
+                    <code className="text-xs px-1.5 py-0.5 rounded" style={{ background: 'rgba(255,255,255,0.07)', color: '#c084fc' }}>write</code> policies.
+                  </span>
+                </li>
+                <li className="flex gap-3">
+                  <span
+                    className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5"
+                    style={{ background: 'rgba(168,85,247,0.1)', color: '#c084fc' }}
+                  >
+                    3
+                  </span>
+                  <span>
+                    In <strong className="text-text-primary">Settings › MikroTik</strong>, enter the router's public IP or hostname, port{' '}
+                    <code className="text-xs px-1.5 py-0.5 rounded" style={{ background: 'rgba(255,255,255,0.07)', color: '#c084fc' }}>8728</code>,
+                    the API username, and password.
+                  </span>
+                </li>
+                <li className="flex gap-3">
+                  <span
+                    className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5"
+                    style={{ background: 'rgba(168,85,247,0.1)', color: '#c084fc' }}
+                  >
+                    4
+                  </span>
+                  <span>
+                    Click <strong className="text-text-primary">Test Connection</strong> (Quick Actions above) to verify reachability, then{' '}
+                    <strong className="text-text-primary">Save &amp; Connect</strong>.
+                  </span>
+                </li>
+              </ol>
+            </div>
+
+            {/* Router requirements */}
+            <div
+              className="rounded-xl p-4"
+              style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)' }}
+            >
+              <h4 className="text-xs font-semibold text-text-primary uppercase tracking-wider mb-3">
+                MikroTik Router Requirements
+              </h4>
+              <ul className="space-y-2 text-xs text-text-secondary">
+                <li className="flex items-start gap-2">
+                  <svg className="w-3.5 h-3.5 flex-shrink-0 mt-0.5 text-text-secondary/40" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                  </svg>
+                  RouterOS <strong className="text-text-primary">v6.x</strong> or <strong className="text-text-primary">v7.x</strong>
+                </li>
+                <li className="flex items-start gap-2">
+                  <svg className="w-3.5 h-3.5 flex-shrink-0 mt-0.5 text-text-secondary/40" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                  </svg>
+                  API service enabled:{' '}
+                  <code className="px-1.5 py-0.5 rounded" style={{ background: 'rgba(255,255,255,0.06)' }}>
+                    /ip service set api disabled=no
+                  </code>
+                </li>
+                <li className="flex items-start gap-2">
+                  <svg className="w-3.5 h-3.5 flex-shrink-0 mt-0.5 text-text-secondary/40" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                  </svg>
+                  API user with policies:{' '}
+                  <code className="px-1 py-0.5 rounded" style={{ background: 'rgba(255,255,255,0.06)' }}>api</code>,{' '}
+                  <code className="px-1 py-0.5 rounded" style={{ background: 'rgba(255,255,255,0.06)' }}>read</code>,{' '}
+                  <code className="px-1 py-0.5 rounded" style={{ background: 'rgba(255,255,255,0.06)' }}>write</code>
+                </li>
+                <li className="flex items-start gap-2">
+                  <svg className="w-3.5 h-3.5 flex-shrink-0 mt-0.5 text-text-secondary/40" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                  </svg>
+                  <em>Agent mode only:</em>&nbsp; port{' '}
+                  <code className="px-1 py-0.5 rounded" style={{ background: 'rgba(255,255,255,0.06)' }}>8728</code>{' '}
+                  must be reachable from the machine running the agent binary
+                </li>
+              </ul>
+            </div>
           </div>
         )}
       </div>
@@ -925,6 +1283,40 @@ export default function MikroTik() {
                 </button>
               </div>
             </div>
+            {/* Password strength indicator */}
+            {pppoeForm.password.length > 0 && (
+              <div className="flex items-center gap-2 -mt-1">
+                <div className="flex gap-1 flex-1">
+                  {[1, 2, 3].map((bar) => (
+                    <div
+                      key={bar}
+                      className="h-1 flex-1 rounded-full transition-colors duration-200"
+                      style={{
+                        background:
+                          pppoeForm.password.length < 8
+                            ? bar === 1 ? '#ef4444' : 'rgba(255,255,255,0.08)'
+                            : pppoeForm.password.length < 12
+                            ? bar <= 2 ? '#eab308' : 'rgba(255,255,255,0.08)'
+                            : '#22c55e',
+                      }}
+                    />
+                  ))}
+                </div>
+                <span
+                  className="text-xs font-medium flex-shrink-0"
+                  style={{
+                    color:
+                      pppoeForm.password.length < 8
+                        ? '#f87171'
+                        : pppoeForm.password.length < 12
+                        ? '#eab308'
+                        : '#4ade80',
+                  }}
+                >
+                  {pppoeForm.password.length < 8 ? 'Weak' : pppoeForm.password.length < 12 ? 'Fair' : 'Strong'}
+                </span>
+              </div>
+            )}
             <div>
               <label className="form-label">Profile</label>
               <input
