@@ -6,22 +6,24 @@ import (
 
 	"github.com/jdns/billingsystem/internal/handler"
 	"github.com/jdns/billingsystem/internal/middleware"
+	"github.com/jdns/billingsystem/internal/mikrotik"
 	"github.com/jdns/billingsystem/internal/service"
 )
 
 // Deps holds all service and handler dependencies required to build the router.
 type Deps struct {
-	AuthService  *service.AuthService
-	AuthHandler  *handler.AuthHandler
-	UserHandler  *handler.UserHandler
-	PlanHandler  *handler.PlanHandler
-	SubHandler   *handler.SubscriptionHandler
-	PayHandler   *handler.PaymentHandler
-	DashHandler  *handler.DashboardHandler
+	AuthService     *service.AuthService
+	AuthHandler     *handler.AuthHandler
+	UserHandler     *handler.UserHandler
+	PlanHandler     *handler.PlanHandler
+	SubHandler      *handler.SubscriptionHandler
+	PayHandler      *handler.PaymentHandler
+	DashHandler     *handler.DashboardHandler
 	MTHandler       *handler.MikroTikHandler
 	NotifHandler    *handler.NotificationHandler
 	SettingsHandler *handler.SettingsHandler
 	MsgHandler      *handler.MessageHandler
+	AgentHub        *mikrotik.AgentHub
 }
 
 // New builds and returns the fully wired HTTP handler with all routes and middleware.
@@ -96,6 +98,12 @@ func New(deps Deps, corsOrigins string) http.Handler {
 	mux.Handle("GET /api/mikrotik/connections", chain(deps.MTHandler.GetActiveConnections, authMW, adminOrTech))
 	mux.Handle("POST /api/mikrotik/test", chain(deps.MTHandler.TestConnection, authMW, adminOnly))
 	mux.Handle("POST /api/mikrotik/connect", chain(deps.MTHandler.SaveAndConnect, authMW, adminOnly))
+
+	// --- MikroTik PPPoE ---
+	mux.Handle("GET /api/mikrotik/pppoe/secrets", chain(deps.MTHandler.ListPPPoESecrets, authMW, adminOrTech))
+
+	// --- Agent WebSocket (token-auth inside ServeHTTP) ---
+	mux.Handle("GET /ws/agent", deps.AgentHub)
 
 	// --- Settings ---
 	mux.Handle("GET /api/settings", chain(deps.SettingsHandler.GetSettings, authMW, adminOnly))

@@ -11,30 +11,24 @@ import (
 // MikroTikHandler handles MikroTik status and connection HTTP requests.
 type MikroTikHandler struct {
 	manager      *mikrotik.Manager
+	agentHub     *mikrotik.AgentHub
 	settingsRepo *repository.SettingsRepo
 }
 
 // NewMikroTikHandler creates a new MikroTikHandler.
-func NewMikroTikHandler(manager *mikrotik.Manager, settingsRepo *repository.SettingsRepo) *MikroTikHandler {
-	return &MikroTikHandler{manager: manager, settingsRepo: settingsRepo}
+func NewMikroTikHandler(manager *mikrotik.Manager, agentHub *mikrotik.AgentHub, settingsRepo *repository.SettingsRepo) *MikroTikHandler {
+	return &MikroTikHandler{manager: manager, agentHub: agentHub, settingsRepo: settingsRepo}
 }
 
 // GetStatus returns whether the MikroTik device is reachable.
 func (h *MikroTikHandler) GetStatus(w http.ResponseWriter, r *http.Request) {
-	connected := h.manager.IsConnected()
+	agentConnected := h.agentHub.IsConnected()
+	directConnected := h.manager.IsConnected()
 
 	result := map[string]interface{}{
-		"connected": connected,
-	}
-
-	// Try to get router info if connected
-	if connected {
-		client := h.manager.Get()
-		if client != nil {
-			if info, err := client.GetActiveConnections(); err == nil {
-				result["queue_count"] = len(info)
-			}
-		}
+		"connected":        agentConnected || directConnected,
+		"agent_connected":  agentConnected,
+		"direct_connected": directConnected,
 	}
 
 	writeJSON(w, http.StatusOK, result)
@@ -139,4 +133,25 @@ func (h *MikroTikHandler) SaveAndConnect(w http.ResponseWriter, r *http.Request)
 		"connected": connected,
 		"message":   "MikroTik settings saved. Status: " + status,
 	})
+}
+
+// ListPPPoESecrets returns all PPPoE secrets from MikroTik via agent or direct connection.
+func (h *MikroTikHandler) ListPPPoESecrets(w http.ResponseWriter, r *http.Request) {
+	var executor mikrotik.MikroTikExecutor
+	if h.agentHub.IsConnected() {
+		executor = h.agentHub
+	} else if c := h.manager.Get(); c != nil {
+		executor = c
+	}
+	if executor == nil {
+		writeError(w, http.StatusServiceUnavailable, "MikroTik not connected")
+		return
+	}
+
+	secrets, err := executor.GetPPPoESecrets()
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to list PPPoE secrets")
+		return
+	}
+	writeJSON(w, http.StatusOK, secrets)
 }
