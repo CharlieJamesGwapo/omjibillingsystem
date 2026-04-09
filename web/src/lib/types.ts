@@ -26,6 +26,7 @@ export interface Plan {
   description?: string | null
   is_active: boolean
   created_at: string
+  mikrotik_profile?: string
 }
 
 export interface Subscription {
@@ -39,6 +40,8 @@ export interface Subscription {
   grace_days: number
   status: SubStatus
   mikrotik_queue_id?: string | null
+  pppoe_username?: string
+  pppoe_password?: string
   created_at: string
   updated_at: string
   // Joined fields
@@ -78,6 +81,21 @@ export interface DashboardStats {
   monthly_income: number
   expected_income: number
   pending_payments: number
+}
+
+export interface PPPoESecret {
+  name: string;
+  password: string;
+  profile: string;
+  disabled: boolean;
+  comment: string;
+}
+
+export interface MikroTikStatus {
+  connected: boolean;
+  agent_connected: boolean;
+  direct_connected: boolean;
+  queue_count?: number;
 }
 
 export interface TokenPair {

@@ -1,12 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import api from '../../lib/api';
-
-interface MikroTikStatus {
-  connected: boolean;
-  address: string;
-  uptime?: string;
-  version?: string;
-}
+import type { MikroTikStatus, PPPoESecret } from '../../lib/types';
 
 interface Connection {
   name: string;
@@ -19,10 +13,20 @@ interface Connection {
 export default function MikroTik() {
   const [status, setStatus] = useState<MikroTikStatus | null>(null);
   const [connections, setConnections] = useState<Connection[]>([]);
+  const [pppoeSecrets, setPppoeSecrets] = useState<PPPoESecret[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [sendingReminders, setSendingReminders] = useState(false);
   const [reminderMsg, setReminderMsg] = useState('');
+
+  const loadPPPoESecrets = async () => {
+    try {
+      const res = await api.get('/api/mikrotik/pppoe/secrets');
+      setPppoeSecrets(res.data);
+    } catch {
+      // silently fail if not connected
+    }
+  };
 
   const fetchData = useCallback(async () => {
     try {
@@ -33,6 +37,9 @@ export default function MikroTik() {
       setStatus(statusRes.data);
       setConnections(connRes.data ?? []);
       setError('');
+      if (statusRes.data?.connected) {
+        loadPPPoESecrets();
+      }
     } catch {
       setError('Failed to load MikroTik data');
     } finally {
@@ -134,6 +141,27 @@ export default function MikroTik() {
           </div>
         </div>
 
+        {/* Agent Status Banner */}
+        <div className={`rounded-lg border p-4 flex items-center gap-3 mb-4 ${
+          status?.agent_connected
+            ? 'bg-green-50 border-green-200'
+            : 'bg-yellow-50 border-yellow-200'
+        }`}>
+          <div className={`w-3 h-3 rounded-full flex-shrink-0 ${
+            status?.agent_connected ? 'bg-green-500' : 'bg-yellow-500'
+          }`} />
+          <div>
+            <p className="font-medium text-sm">
+              {status?.agent_connected ? 'Local Agent Connected' : 'Local Agent Offline'}
+            </p>
+            <p className="text-xs text-gray-500">
+              {status?.agent_connected
+                ? 'MikroTik commands route through local agent'
+                : 'Run the mikrotik-agent binary on your local network'}
+            </p>
+          </div>
+        </div>
+
         {/* Router Details Mini Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="stat-card">
@@ -222,6 +250,55 @@ export default function MikroTik() {
           </table>
         </div>
       </div>
+
+      {/* PPPoE Secrets Section */}
+      {status?.connected && (
+        <div className="bg-white rounded-xl border border-gray-200 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-gray-900">PPPoE Secrets</h2>
+            <button
+              onClick={loadPPPoESecrets}
+              className="text-sm text-blue-600 hover:text-blue-700"
+            >
+              Refresh
+            </button>
+          </div>
+          {pppoeSecrets.length === 0 ? (
+            <p className="text-sm text-gray-500">No PPPoE secrets found or not loaded yet.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left border-b border-gray-100">
+                    <th className="pb-2 pr-4 font-medium text-gray-600">Username</th>
+                    <th className="pb-2 pr-4 font-medium text-gray-600">Profile</th>
+                    <th className="pb-2 pr-4 font-medium text-gray-600">Status</th>
+                    <th className="pb-2 font-medium text-gray-600">Comment</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pppoeSecrets.map(s => (
+                    <tr key={s.name} className="border-b border-gray-50 last:border-0">
+                      <td className="py-2 pr-4 font-mono text-gray-900">{s.name}</td>
+                      <td className="py-2 pr-4 text-gray-700">{s.profile}</td>
+                      <td className="py-2 pr-4">
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                          s.disabled
+                            ? 'bg-red-100 text-red-700'
+                            : 'bg-green-100 text-green-700'
+                        }`}>
+                          {s.disabled ? 'Disabled' : 'Active'}
+                        </span>
+                      </td>
+                      <td className="py-2 text-gray-500 text-xs">{s.comment}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
