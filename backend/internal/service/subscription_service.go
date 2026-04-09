@@ -3,7 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
-	"time"
+	"log"
 
 	"github.com/google/uuid"
 	"github.com/jdns/billingsystem/internal/mikrotik"
@@ -16,6 +16,7 @@ type SubscriptionService struct {
 	subRepo   *repository.SubscriptionRepo
 	planRepo  *repository.PlanRepo
 	mtManager *mikrotik.Manager
+	agentHub  *mikrotik.AgentHub
 }
 
 // NewSubscriptionService creates a new SubscriptionService.
@@ -23,54 +24,82 @@ func NewSubscriptionService(
 	subRepo *repository.SubscriptionRepo,
 	planRepo *repository.PlanRepo,
 	mtManager *mikrotik.Manager,
+	agentHub *mikrotik.AgentHub,
 ) *SubscriptionService {
 	return &SubscriptionService{
 		subRepo:   subRepo,
 		planRepo:  planRepo,
 		mtManager: mtManager,
+		agentHub:  agentHub,
 	}
+}
+
+// getMTExecutor returns the best available MikroTik executor.
+// Prefers agent hub if connected, falls back to direct client, returns nil if neither available.
+func (s *SubscriptionService) getMTExecutor() mikrotik.MikroTikExecutor {
+	if s.agentHub != nil && s.agentHub.IsConnected() {
+		return s.agentHub
+	}
+	if c := s.mtManager.Get(); c != nil {
+		return c
+	}
+	return nil
+}
+
+// planProfile returns the MikroTik profile name for a plan.
+// Uses MikroTikProfile if set, falls back to plan Name.
+func planProfile(plan *model.Plan) string {
+	if plan.MikroTikProfile != nil && *plan.MikroTikProfile != "" {
+		return *plan.MikroTikProfile
+	}
+	return plan.Name
 }
 
 // Create creates a new subscription. BillingDay is capped at 28, nextDueDate is set to
 // next month on that day, and grace period defaults to 2 days. If an IP is provided and
 // the MikroTik client is available, a bandwidth queue is created.
 func (s *SubscriptionService) Create(ctx context.Context, req *model.CreateSubscriptionRequest) (*model.Subscription, error) {
-	// Cap billing day at 28
 	if req.BillingDay > 28 {
 		req.BillingDay = 28
 	}
 	if req.BillingDay < 1 {
 		req.BillingDay = 1
 	}
-
-	// Default grace period
 	if req.GraceDays == nil {
 		defaultGrace := 2
 		req.GraceDays = &defaultGrace
 	}
-
-	// Calculate nextDueDate: next month on billing day
-	now := time.Now()
-	nextDue := time.Date(now.Year(), now.Month()+1, req.BillingDay, 0, 0, 0, 0, time.UTC)
-	// If that day is today (edge case), still push to next month
-	_ = nextDue // repo recalculates this, but keep consistent logic
 
 	sub, err := s.subRepo.Create(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("create subscription: %w", err)
 	}
 
-	// Create MikroTik queue if IP provided and client is available
-	mtClient := s.mtManager.Get()
-	if req.IPAddress != nil && *req.IPAddress != "" && mtClient != nil {
-		plan, err := s.planRepo.GetByID(ctx, req.PlanID)
-		if err == nil {
-			speed := mtClient.SpeedString(plan.SpeedMbps)
-			queueName := fmt.Sprintf("sub-%s", sub.ID.String())
-			queueID, err := mtClient.CreateQueue(queueName, *req.IPAddress, speed, speed)
-			if err == nil && queueID != "" {
-				_ = s.subRepo.UpdateMikroTikQueueID(ctx, sub.ID, &queueID)
-				sub.MikroTikQueueID = &queueID
+	mt := s.getMTExecutor()
+	if mt != nil {
+		plan, planErr := s.planRepo.GetByID(ctx, req.PlanID)
+		if planErr == nil {
+			// Provision PPPoE secret
+			if req.PPPoEUsername != nil && *req.PPPoEUsername != "" {
+				password := ""
+				if req.PPPoEPassword != nil {
+					password = *req.PPPoEPassword
+				}
+				profile := planProfile(plan)
+				if err := mt.AddPPPoESecret(*req.PPPoEUsername, password, profile); err != nil {
+					log.Printf("[MikroTik] AddPPPoESecret failed for %s: %v", *req.PPPoEUsername, err)
+				}
+			}
+
+			// Create Simple Queue (IP-based, existing behavior)
+			if req.IPAddress != nil && *req.IPAddress != "" {
+				speed := fmt.Sprintf("%dM", plan.SpeedMbps)
+				queueName := fmt.Sprintf("sub-%s", sub.ID.String())
+				queueID, err := mt.CreateQueue(queueName, *req.IPAddress, speed, speed)
+				if err == nil && queueID != "" {
+					_ = s.subRepo.UpdateMikroTikQueueID(ctx, sub.ID, &queueID)
+					sub.MikroTikQueueID = &queueID
+				}
 			}
 		}
 	}
@@ -121,16 +150,20 @@ func (s *SubscriptionService) Disconnect(ctx context.Context, id uuid.UUID) erro
 		return fmt.Errorf("get subscription: %w", err)
 	}
 
-	if mtClient := s.mtManager.Get(); mtClient != nil && sub.MikroTikQueueID != nil && *sub.MikroTikQueueID != "" {
-		if err := mtClient.DisableQueue(*sub.MikroTikQueueID); err != nil {
-			return fmt.Errorf("disable mikrotik queue: %w", err)
+	if mt := s.getMTExecutor(); mt != nil {
+		if sub.PPPoEUsername != nil && *sub.PPPoEUsername != "" {
+			if err := mt.DisablePPPoEUser(*sub.PPPoEUsername); err != nil {
+				log.Printf("[MikroTik] DisablePPPoEUser %s: %v", *sub.PPPoEUsername, err)
+			}
+		}
+		if sub.MikroTikQueueID != nil && *sub.MikroTikQueueID != "" {
+			if err := mt.DisableQueue(*sub.MikroTikQueueID); err != nil {
+				log.Printf("[MikroTik] DisableQueue %s: %v", *sub.MikroTikQueueID, err)
+			}
 		}
 	}
 
-	if err := s.subRepo.UpdateStatus(ctx, id, model.SubStatusSuspended); err != nil {
-		return fmt.Errorf("update subscription status: %w", err)
-	}
-	return nil
+	return s.subRepo.UpdateStatus(ctx, id, model.SubStatusSuspended)
 }
 
 // Reconnect enables the MikroTik queue and marks the subscription as active.
@@ -140,16 +173,46 @@ func (s *SubscriptionService) Reconnect(ctx context.Context, id uuid.UUID) error
 		return fmt.Errorf("get subscription: %w", err)
 	}
 
-	if mtClient := s.mtManager.Get(); mtClient != nil && sub.MikroTikQueueID != nil && *sub.MikroTikQueueID != "" {
-		if err := mtClient.EnableQueue(*sub.MikroTikQueueID); err != nil {
-			return fmt.Errorf("enable mikrotik queue: %w", err)
+	if mt := s.getMTExecutor(); mt != nil {
+		if sub.PPPoEUsername != nil && *sub.PPPoEUsername != "" {
+			if err := mt.EnablePPPoEUser(*sub.PPPoEUsername); err != nil {
+				log.Printf("[MikroTik] EnablePPPoEUser %s: %v", *sub.PPPoEUsername, err)
+			}
+			plan, planErr := s.planRepo.GetByID(ctx, sub.PlanID)
+			if planErr == nil {
+				if err := mt.SetPPPoEProfile(*sub.PPPoEUsername, planProfile(plan)); err != nil {
+					log.Printf("[MikroTik] SetPPPoEProfile %s: %v", *sub.PPPoEUsername, err)
+				}
+			}
+		}
+		if sub.MikroTikQueueID != nil && *sub.MikroTikQueueID != "" {
+			if err := mt.EnableQueue(*sub.MikroTikQueueID); err != nil {
+				log.Printf("[MikroTik] EnableQueue %s: %v", *sub.MikroTikQueueID, err)
+			}
 		}
 	}
 
-	if err := s.subRepo.UpdateStatus(ctx, id, model.SubStatusActive); err != nil {
-		return fmt.Errorf("update subscription status: %w", err)
+	return s.subRepo.UpdateStatus(ctx, id, model.SubStatusActive)
+}
+
+// MarkOverdue sets a subscription to overdue status and changes PPPoE profile to "unpaid".
+// Use this for automated overdue processing (cron). The "unpaid" profile in MikroTik
+// prevents new dial attempts and logs errors, without fully disabling the secret.
+func (s *SubscriptionService) MarkOverdue(ctx context.Context, id uuid.UUID) error {
+	sub, err := s.subRepo.GetByID(ctx, id)
+	if err != nil {
+		return fmt.Errorf("get subscription: %w", err)
 	}
-	return nil
+
+	if mt := s.getMTExecutor(); mt != nil {
+		if sub.PPPoEUsername != nil && *sub.PPPoEUsername != "" {
+			if err := mt.SetPPPoEProfile(*sub.PPPoEUsername, "unpaid"); err != nil {
+				log.Printf("[MikroTik] SetPPPoEProfile unpaid %s: %v", *sub.PPPoEUsername, err)
+			}
+		}
+	}
+
+	return s.subRepo.UpdateStatus(ctx, id, model.SubStatusOverdue)
 }
 
 // GetOverdue returns subscriptions that are past their grace period and not yet suspended.
