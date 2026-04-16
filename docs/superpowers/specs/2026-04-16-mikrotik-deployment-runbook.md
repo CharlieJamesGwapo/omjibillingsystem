@@ -266,12 +266,12 @@ Run these in order. Stop at the first failure and diagnose.
 
 ---
 
-## 11. Open questions before execution
+## 11. Decisions (user approved 2026-04-16: "do the recommended")
 
-These need user answers before we write the implementation plan:
-
-1. **Web app URL**: do you have a domain to point at the Render web service, or use the default `*.onrender.com`?
-2. **Agent host**: do you already own a Raspberry Pi / mini-PC, or do you need to acquire one? (If you have an always-on Windows or Mac at the office, we can start there.)
-3. **Database choice**: Render Postgres or Neon?
-4. **Plan list**: how many speed tiers will you start with, and what are the rate limits? (Drives how many PPP profiles to define.)
-5. **Existing customers**: any active customers to migrate now, or is this greenfield?
+| # | Question | Decision | Notes |
+|---|---|---|---|
+| 1 | Web app URL | Default `*.onrender.com` | Custom domain can be added later — `Settings → Custom Domain` on Render Static Site |
+| 2 | Agent host | **Raspberry Pi 4 (2GB+)** | Acquire if not owned. Interim fallback: any always-on Windows/Mac PC at the office (same systemd → equivalent service manager) |
+| 3 | Database | **Neon free tier** to start | ~3GB free; migrate to Render Postgres or Neon paid when traffic justifies it |
+| 4 | Initial speed tiers | **3 tiers**: `PLAN-10M` (10/10), `PLAN-25M` (25/25), `PLAN-50M` (50/50) | Plus the `unpaid` profile (64k/64k). Add more later via WebFig + new Plan rows |
+| 5 | Existing customers | **Greenfield** | No migration. Test customers only during verification, deleted afterward |
