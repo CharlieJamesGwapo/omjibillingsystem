@@ -1,0 +1,5 @@
+dist/
+mikrotik-agent
+mikrotik-agent-*
+billingsystem-agent
+*.exe
